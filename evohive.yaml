@@ -1,0 +1,77 @@
+# EvoHive v3.0 多模型配置
+# 环境变量需提前设置:
+#   export DEEPSEEK_API_KEY=sk-xxx
+#   export GROQ_API_KEY=gsk_xxx
+#   export GEMINI_API_KEY=AIzaSyxxx
+#   export ZHIPUAI_API_KEY=xxx.xxx
+#   export SILICONFLOW_API_KEY=sk-xxx
+#   export OPENAI_API_KEY=sk-xxx        # 用于 Embedding
+#   export TAVILY_API_KEY=tvly-xxx      # Web Search (可选)
+#   export SERPER_API_KEY=xxx           # Web Search (可选, 备选)
+
+# ── 运行模式 ──
+# fast: Swarm 200种子, 1代进化, 无辩论/压力测试 (~1-2分钟, ~$0.5)
+# deep: Swarm 500+种子, 3代进化, 全功能 (~8-15分钟, ~$3-5)
+mode: deep
+
+# ── Swarm 层（千级 Agent 策略探索）──
+# 用最便宜的 Flash 级模型批量生成策略种子
+swarm_models:
+  - model: gemini/gemini-2.0-flash
+    count: 1
+  - model: deepseek/deepseek-chat
+    count: 1
+
+swarm_count: 500              # 种子总数 (fast模式自动降到200)
+swarm_max_representatives: 50  # 最终选出的代表方案数
+
+# ── Embedding 模型 (用于语义相似度) ──
+embedding_model: text-embedding-3-small
+
+# ── Judge 陪审团（多模型独立评审）──
+judges:
+  - model: deepseek/deepseek-chat
+  - model: groq/llama-3.3-70b-versatile
+  - model: gemini/gemini-2.0-flash
+  - model: zhipuai/glm-4-flash
+  - model: siliconflow/Qwen/Qwen2.5-7B-Instruct
+
+# ── Thinker 思考者（方案扩展 + 交叉变异用）──
+thinkers:
+  - model: deepseek/deepseek-chat
+    count: 2
+  - model: groq/llama-3.3-70b-versatile
+    count: 2
+  - model: gemini/gemini-2.0-flash
+    count: 2
+  - model: zhipuai/glm-4-flash
+    count: 2
+  - model: siliconflow/Qwen/Qwen2.5-7B-Instruct
+    count: 2
+
+# ── Red Team 红队攻击者 ──
+red_team:
+  - model: groq/llama-3.3-70b-versatile
+  - model: gemini/gemini-2.0-flash
+  - model: zhipuai/glm-4-flash
+
+# ── 进化参数 ──
+population_size: 50    # Swarm 产出的方案数 (= swarm_max_representatives)
+generations: 3
+
+# ── 功能开关 ──
+enable_swarm: true
+enable_pairwise_judge: true
+enable_swiss_tournament: true   # 瑞士轮 (大种群高效排名)
+enable_elimination_memory: true
+enable_diversity_guard: true
+enable_fresh_blood: true
+enable_red_team: true
+enable_debate: true
+enable_pressure_test: true
+enable_web_search: true
+
+# ── 阈值参数 ──
+homogeneity_threshold: 0.6
+fresh_blood_interval: 2
+convergence_threshold: 0.7
