@@ -1,0 +1,3180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>EvoHive — Evolution War</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Share+Tech+Mono&display=swap">
+<style>
+/* === RESET & BASE === */
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0a0e0a;--panel:#0d1a0d;--border:#1a3a1a;--text:#c8e6c8;--dim:#6b8f6b;
+  --gold:#ffd700;--silver:#c0c0c0;--bronze:#cd7f32;
+  --hp-high:#00ff41;--hp-mid:#ffaa00;--hp-low:#ff3333;
+  --deepseek:#4a9eff;--gemini:#34d399;--groq:#f97316;--zhipu:#a855f7;--openai:#e2e8f0;--anthropic:#d4a574;--silicon:#22d3ee;
+}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:'Share Tech Mono',monospace}
+/* === LAYOUT === */
+#app{display:flex;width:100%;height:100%}
+#canvas-wrap{flex:1;position:relative;overflow:hidden}
+canvas{display:block;width:100%;height:100%}
+#sidebar{width:280px;background:var(--panel);border-left:2px solid var(--border);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0}
+/* === SIDEBAR === */
+.sb-header{padding:8px 12px;background:#0a150a;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.sb-title{font-family:'Press Start 2P',monospace;font-size:9px;color:var(--gold);letter-spacing:1px}
+#lang-btn{background:none;border:1px solid var(--dim);color:var(--text);font-family:'Share Tech Mono',monospace;font-size:11px;padding:2px 8px;cursor:pointer;border-radius:2px}
+#lang-btn:hover{border-color:var(--gold);color:var(--gold)}
+.sb-section{padding:8px 12px;border-bottom:1px solid var(--border)}
+.sb-label{font-size:9px;color:var(--dim);text-transform:uppercase;margin-bottom:4px;font-family:'Press Start 2P',monospace;letter-spacing:1px}
+/* Phase indicator */
+#phase-name{font-family:'Press Start 2P',monospace;font-size:8px;color:var(--gold);margin-top:4px}
+#phase-sub{font-size:11px;color:var(--dim);margin-top:2px}
+/* Stats row */
+.stats-row{display:flex;gap:8px;flex-wrap:wrap}
+.stat-box{flex:1;min-width:70px;background:#0a150a;border:1px solid var(--border);border-radius:2px;padding:4px 6px;text-align:center}
+.stat-val{font-family:'Press Start 2P',monospace;font-size:10px;color:var(--hp-high)}
+.stat-lbl{font-size:9px;color:var(--dim);margin-top:2px}
+/* Faction list */
+.faction-card{display:flex;align-items:center;gap:8px;padding:4px 0;cursor:pointer;border-radius:2px;transition:background .2s}
+.faction-card:hover{background:rgba(255,255,255,.05)}
+.faction-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.faction-info{flex:1;min-width:0}
+.faction-name{font-size:11px;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.faction-stats{font-size:9px;color:var(--dim)}
+.faction-bar{height:4px;background:#1a1a1a;border-radius:2px;margin-top:2px;overflow:hidden}
+.faction-bar-fill{height:100%;border-radius:2px;transition:width .5s}
+/* Kill feed */
+#killfeed{flex:1;overflow-y:auto;padding:8px 12px;font-size:10px;line-height:1.6}
+.kf-entry{opacity:.8;border-left:2px solid var(--dim);padding-left:6px;margin-bottom:3px}
+/* Battle log */
+#battlelog{max-height:120px;overflow-y:auto;padding:8px 12px;font-size:10px;line-height:1.5;border-top:1px solid var(--border)}
+.bl-entry{color:var(--dim);margin-bottom:2px}
+.bl-entry span{color:var(--text)}
+/* === TOP HUD === */
+#hud{position:absolute;top:0;left:0;right:0;display:flex;justify-content:center;align-items:center;padding:8px 16px;pointer-events:none;z-index:10}
+#alive-counter{font-family:'Press Start 2P',monospace;font-size:14px;color:var(--hp-high);text-shadow:0 0 10px rgba(0,255,65,.5)}
+#gen-counter{font-family:'Press Start 2P',monospace;font-size:10px;color:var(--gold);margin-left:20px}
+/* === CINEMATIC BARS === */
+.cine-bar{position:absolute;left:0;right:0;height:0;background:#000;z-index:20;transition:height .4s}
+#cine-top{top:0}
+#cine-bot{bottom:0}
+/* === PHASE ANNOUNCE === */
+#announce{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:25;pointer-events:none;text-align:center;opacity:0;transition:opacity .3s}
+#announce-title{font-family:'Press Start 2P',monospace;font-size:18px;color:var(--gold);text-shadow:0 0 20px rgba(255,215,0,.6);letter-spacing:3px}
+#announce-sub{font-size:13px;color:var(--text);margin-top:8px;opacity:.7}
+/* === RESULTS OVERLAY === */
+#results{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:50;display:none;overflow-y:auto;padding:40px}
+.res-inner{max-width:700px;margin:0 auto}
+.res-crown{text-align:center;font-size:48px;margin-bottom:8px}
+.res-champ{text-align:center;font-family:'Press Start 2P',monospace;font-size:14px;color:var(--gold);margin-bottom:4px}
+.res-champ-sub{text-align:center;font-size:12px;color:var(--dim);margin-bottom:24px}
+.res-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px}
+.res-card{background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:12px;text-align:center}
+.res-card-val{font-family:'Press Start 2P',monospace;font-size:14px;color:var(--hp-high)}
+.res-card-lbl{font-size:10px;color:var(--dim);margin-top:4px}
+.res-section{margin-bottom:20px}
+.res-section-title{font-family:'Press Start 2P',monospace;font-size:10px;color:var(--gold);margin-bottom:8px;border-bottom:1px solid var(--border);padding-bottom:4px}
+.res-faction-row{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:11px}
+.res-rank-row{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:11px;border-bottom:1px solid rgba(255,255,255,.05)}
+.res-rank-num{font-family:'Press Start 2P',monospace;font-size:10px;width:24px;text-align:center}
+#res-answer{background:#0a150a;border:1px solid var(--border);border-radius:4px;padding:12px;font-size:11px;line-height:1.6;color:var(--text);max-height:200px;overflow-y:auto;margin-top:8px}
+#restart-btn{display:block;margin:24px auto 0;background:var(--gold);color:#000;font-family:'Press Start 2P',monospace;font-size:10px;border:none;padding:10px 24px;cursor:pointer;border-radius:2px}
+#restart-btn:hover{background:#fff}
+/* === AGENT DETAIL POPUP === */
+#agent-detail{position:absolute;background:var(--panel);border:1px solid var(--gold);border-radius:4px;padding:10px;font-size:10px;z-index:15;display:none;pointer-events:none;min-width:180px}
+.ad-name{font-family:'Press Start 2P',monospace;font-size:9px;color:var(--gold);margin-bottom:6px}
+.ad-row{display:flex;justify-content:space-between;margin-bottom:2px}
+.ad-row span:first-child{color:var(--dim)}
+/* Scrollbar */
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--dim);border-radius:2px}
+/* Controls bar */
+#controls{position:absolute;bottom:12px;left:12px;z-index:10;pointer-events:auto;display:flex;gap:4px}
+#controls button{background:#1a1a1a;color:var(--hp-high);border:1px solid var(--border);font-family:'Share Tech Mono',monospace;font-size:12px;padding:4px 10px;cursor:pointer;border-radius:2px;transition:all .2s}
+#controls button:hover{border-color:var(--gold);color:var(--gold)}
+#controls button.active{background:var(--gold);color:#000;border-color:var(--gold)}
+/* Phase timeline */
+#phase-timeline{display:flex;gap:2px;margin-top:6px;flex-wrap:wrap}
+.pt-dot{width:8px;height:8px;border-radius:50%;background:#1a1a1a;border:1px solid var(--border);transition:all .3s;position:relative}
+.pt-dot.done{background:var(--hp-high);border-color:var(--hp-high);box-shadow:0 0 4px rgba(0,255,65,.4)}
+.pt-dot.active{background:var(--gold);border-color:var(--gold);box-shadow:0 0 6px rgba(255,215,0,.6);animation:pt-pulse 1s infinite}
+.pt-dot[title]:hover::after{content:attr(title);position:absolute;bottom:12px;left:50%;transform:translateX(-50%);background:#000;color:var(--text);font-size:8px;padding:2px 4px;border-radius:2px;white-space:nowrap;z-index:5}
+@keyframes pt-pulse{0%,100%{opacity:1}50%{opacity:.5}}
+/* Focus styles */
+button:focus-visible,#lang-btn:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.cfg-prov:focus-visible{outline:2px solid var(--gold);outline-offset:1px}
+/* === CONFIG MODAL === */
+#config-modal{position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:100;display:flex;align-items:center;justify-content:center;overflow-y:auto;padding:20px}
+.cfg-box{background:var(--panel);border:1px solid var(--border);border-radius:6px;width:820px;max-width:95vw;max-height:90vh;overflow-y:auto;padding:0}
+.cfg-header{padding:16px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.cfg-header h1{font-family:'Press Start 2P',monospace;font-size:12px;color:var(--gold);letter-spacing:2px}
+.cfg-header span{font-size:11px;color:var(--dim)}
+.cfg-body{padding:20px 24px;display:flex;flex-direction:column;gap:20px}
+.cfg-row{display:flex;gap:20px;align-items:flex-start}
+.cfg-col{flex:1;min-width:0}
+.cfg-label{font-family:'Press Start 2P',monospace;font-size:8px;color:var(--dim);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
+.cfg-slider-row{display:flex;align-items:center;gap:12px}
+.cfg-slider-row input[type=range]{flex:1;accent-color:var(--gold);height:6px}
+.cfg-slider-val{font-family:'Press Start 2P',monospace;font-size:14px;color:var(--hp-high);min-width:40px;text-align:right}
+.cfg-gen-row{display:flex;align-items:center;gap:12px;margin-top:8px}
+.cfg-gen-row input[type=range]{flex:1;accent-color:var(--gold);height:6px}
+/* Provider grid */
+.cfg-providers{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;max-height:400px;overflow-y:auto;padding-right:4px}
+.cfg-prov{background:#0a150a;border:1px solid var(--border);border-radius:4px;padding:8px;cursor:pointer;transition:all .2s;user-select:none}
+.cfg-prov:hover{border-color:var(--dim)}
+.cfg-prov.selected{border-color:var(--gold);background:#1a2a0a}
+.cfg-prov-head{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+.cfg-prov-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.cfg-prov-name{font-size:11px;font-weight:bold;color:var(--text)}
+.cfg-prov-models{font-size:9px;color:var(--dim);line-height:1.4}
+.cfg-prov .cfg-check{width:14px;height:14px;border:1px solid var(--dim);border-radius:2px;display:inline-flex;align-items:center;justify-content:center;font-size:10px;margin-right:2px;color:transparent;flex-shrink:0}
+.cfg-prov.selected .cfg-check{background:var(--gold);border-color:var(--gold);color:#000}
+/* Start button */
+.cfg-footer{padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.cfg-footer .cfg-summary{font-size:10px;color:var(--dim)}
+.cfg-footer .cfg-summary strong{color:var(--hp-high)}
+#start-war-btn{background:var(--gold);color:#000;font-family:'Press Start 2P',monospace;font-size:11px;border:none;padding:12px 28px;cursor:pointer;border-radius:3px;letter-spacing:1px;transition:all .2s}
+#start-war-btn:hover{background:#fff;transform:scale(1.02)}
+#start-war-btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+/* === MOBILE RESPONSIVE === */
+@media(max-width:768px){
+  #sidebar{display:none}
+  #app{flex-direction:column}
+  #hud{padding:4px 8px}
+  #alive-counter{font-size:10px}
+  #gen-counter{font-size:8px}
+  #controls{bottom:8px;left:8px}
+  #controls button{font-size:14px;padding:6px 12px;min-width:36px;min-height:36px}
+  #announce-title{font-size:12px}
+  #announce-sub{font-size:10px}
+  .cfg-providers{grid-template-columns:repeat(2,1fr)}
+  .cfg-box{max-width:98vw}
+  .cfg-body{padding:12px}
+  .cfg-row{flex-direction:column}
+  #results{padding:16px}
+  .res-grid{grid-template-columns:repeat(2,1fr)}
+  .res-inner{max-width:100%}
+}
+@media(max-width:480px){
+  .cfg-providers{grid-template-columns:1fr}
+  #controls button{font-size:16px;padding:8px 14px}
+}
+/* === ONBOARDING HINT === */
+#hint-overlay{position:absolute;bottom:60px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.85);border:1px solid var(--border);border-radius:6px;padding:10px 18px;z-index:12;pointer-events:none;text-align:center;transition:opacity .6s;font-size:11px;color:var(--text);white-space:nowrap}
+#hint-overlay .hint-key{display:inline-block;background:var(--border);color:var(--gold);border-radius:3px;padding:1px 6px;font-family:'Share Tech Mono',monospace;font-size:10px;margin:0 2px}
+/* === MOBILE SIDEBAR TOGGLE === */
+#mobile-sb-btn{display:none;position:absolute;top:8px;right:8px;z-index:11;background:var(--panel);border:1px solid var(--border);color:var(--text);font-size:18px;padding:4px 8px;border-radius:4px;cursor:pointer}
+@media(max-width:768px){
+  #mobile-sb-btn{display:block}
+  #sidebar.mobile-show{display:flex;position:fixed;right:0;top:0;bottom:0;z-index:30;width:280px;box-shadow:-4px 0 20px rgba(0,0,0,.6)}
+}
+/* Config error message */
+.cfg-error{color:var(--hp-low);font-size:10px;font-family:'Press Start 2P',monospace;margin-top:4px;display:none}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="canvas-wrap">
+    <canvas id="cv" role="img" aria-label="EvoHive battle visualization"></canvas>
+    <div id="hud">
+      <span id="alive-counter" role="status" aria-live="polite" aria-label="Alive agents count">ALIVE: 60</span>
+      <span id="gen-counter" role="status" aria-label="Current generation">GEN 1</span>
+    </div>
+    <div id="cine-top" class="cine-bar"></div>
+    <div id="cine-bot" class="cine-bar"></div>
+    <div id="announce"><div id="announce-title"></div><div id="announce-sub"></div></div>
+    <div id="agent-detail"></div>
+    <div id="controls">
+      <button id="pause-btn" title="Pause/Play">⏸</button>
+      <button class="speed-btn active" data-speed="1">1x</button>
+      <button class="speed-btn" data-speed="2">2x</button>
+      <button class="speed-btn" data-speed="4">4x</button>
+      <button id="reset-cam-btn" title="Reset camera">⌂</button>
+    </div>
+    <div id="hint-overlay">
+      <span data-i18n="hint">Scroll to zoom · Drag to pan · Click agent for details</span><br>
+      <span class="hint-key">SPACE</span> Pause  <span class="hint-key">1</span><span class="hint-key">2</span><span class="hint-key">3</span> Speed  <span class="hint-key">R</span> Reset cam
+    </div>
+    <button id="mobile-sb-btn" aria-label="Toggle sidebar">☰</button>
+  </div>
+  <div id="sidebar">
+    <div class="sb-header">
+      <span class="sb-title">EVOHIVE WAR</span>
+      <button id="lang-btn">EN/中</button>
+    </div>
+    <div class="sb-section">
+      <div class="sb-label" data-i18n="phase">PHASE</div>
+      <div id="phase-name">STANDBY</div>
+      <div id="phase-sub"></div>
+      <div id="phase-timeline"></div>
+    </div>
+    <div class="sb-section">
+      <div class="stats-row">
+        <div class="stat-box"><div class="stat-val" id="st-alive">60</div><div class="stat-lbl" data-i18n="alive">ALIVE</div></div>
+        <div class="stat-box"><div class="stat-val" id="st-gen">1</div><div class="stat-lbl" data-i18n="gen">GEN</div></div>
+        <div class="stat-box"><div class="stat-val" id="st-kills">0</div><div class="stat-lbl" data-i18n="kills">KILLS</div></div>
+      </div>
+    </div>
+    <div class="sb-section" id="faction-list">
+      <div class="sb-label" data-i18n="factions">FACTIONS</div>
+    </div>
+    <div class="sb-section" style="flex-shrink:0">
+      <div class="sb-label" data-i18n="killfeed">KILL FEED</div>
+    </div>
+    <div id="killfeed"></div>
+    <div id="battlelog"></div>
+  </div>
+</div>
+<div id="results">
+  <div class="res-inner" id="res-content"></div>
+</div>
+<div id="config-modal">
+  <div class="cfg-box">
+    <div class="cfg-header">
+      <h1>EVOHIVE WAR</h1>
+      <span>Configure your battle royale</span>
+    </div>
+    <div class="cfg-body">
+      <div class="cfg-row">
+        <div class="cfg-col">
+          <div class="cfg-label">AGENTS (POPULATION)</div>
+          <div class="cfg-slider-row">
+            <input type="range" id="cfg-agents" min="10" max="200" step="10" value="60">
+            <div class="cfg-slider-val" id="cfg-agents-val">60</div>
+          </div>
+          <div class="cfg-label" style="margin-top:14px">GENERATIONS</div>
+          <div class="cfg-gen-row">
+            <input type="range" id="cfg-gens" min="1" max="6" step="1" value="3">
+            <div class="cfg-slider-val" id="cfg-gens-val">3</div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="cfg-label">SELECT MODELS / FACTIONS <span style="color:var(--gold)">(min 2)</span></div>
+        <div class="cfg-providers" id="cfg-providers"></div>
+      </div>
+    </div>
+    <div class="cfg-footer">
+      <div><div class="cfg-summary">Selected: <strong id="cfg-sel-count">0</strong> factions | <strong id="cfg-sel-agents">60</strong> agents</div><div class="cfg-error" id="cfg-error">Select at least 2 factions to start</div></div>
+      <button id="start-war-btn">START WAR</button>
+    </div>
+  </div>
+</div>
+<script>
+/* ============================================================
+   EVOHIVE WAR — Battle Royale Visualization
+   ============================================================ */
+
+/* ---------- SECTION: CONFIG ---------- */
+let TOTAL=60, COLS=28, ROWS=28, TW=28, TH=28;
+let GENS=3;
+let simSpeed=1, simPaused=false;
+
+/* Full provider/model registry matching EvoHive core */
+const ALL_PROVIDERS=[
+  {id:'openai',name:'OpenAI',color:'#e2e8f0',models:['gpt-4o','gpt-4.1','gpt-4.1-mini','gpt-4.1-nano','gpt-4o-mini','o3-mini']},
+  {id:'anthropic',name:'Anthropic',color:'#d4a574',models:['claude-sonnet-4','claude-3.5-haiku']},
+  {id:'gemini',name:'Google Gemini',color:'#34d399',models:['gemini-2.5-pro','gemini-2.5-flash','gemini-2.0-flash']},
+  {id:'deepseek',name:'DeepSeek',color:'#4a9eff',models:['deepseek-chat','deepseek-reasoner']},
+  {id:'groq',name:'Groq',color:'#f97316',models:['llama-3.3-70b','llama-3.1-8b','gemma2-9b']},
+  {id:'mistral',name:'Mistral',color:'#ff6b6b',models:['mistral-large','mistral-small']},
+  {id:'xai',name:'xAI (Grok)',color:'#1da1f2',models:['grok-3','grok-3-mini']},
+  {id:'together',name:'Together AI',color:'#7c3aed',models:['Llama-3.3-70B-Turbo','Qwen2.5-72B-Turbo']},
+  {id:'fireworks',name:'Fireworks AI',color:'#ef4444',models:['llama-v3.3-70b']},
+  {id:'cohere',name:'Cohere',color:'#39d353',models:['command-r-plus','command-r']},
+  {id:'zhipuai',name:'ZhipuAI (智谱)',color:'#a855f7',models:['glm-4-plus','glm-4-flash']},
+  {id:'siliconflow',name:'SiliconFlow (硅基)',color:'#22d3ee',models:['Qwen2.5-72B','Qwen2.5-7B']},
+  {id:'moonshot',name:'Moonshot (Kimi)',color:'#fbbf24',models:['moonshot-v1-auto']},
+  {id:'baichuan',name:'Baichuan (百川)',color:'#f472b6',models:['Baichuan4']},
+  {id:'yi',name:'Yi (零一万物)',color:'#818cf8',models:['yi-large']},
+  {id:'perplexity',name:'Perplexity',color:'#06b6d4',models:['sonar-pro','sonar']},
+  {id:'dashscope',name:'DashScope (阿里云)',color:'#fb923c',models:['qwen-max','qwen-plus','qwen-turbo']},
+  {id:'volcengine',name:'Volcengine (豆包)',color:'#4ade80',models:['doubao-pro-256k']},
+  {id:'minimax',name:'Minimax',color:'#c084fc',models:['MiniMax-Text-01']}
+];
+let selectedProviders=new Set(['openai','anthropic','gemini','deepseek','groq','zhipuai','siliconflow']);
+let FACTIONS=[];
+function buildFactions(){
+  FACTIONS=ALL_PROVIDERS.filter(p=>selectedProviders.has(p.id)).map(p=>({id:p.id,name:p.name,color:p.color,soldiers:0}));
+}
+buildFactions();
+const PHASES=[
+  {key:'seed',en:'SEED GENERATION',zh:'种群生成',sub_en:'Deploying initial population',sub_zh:'部署初始种群'},
+  {key:'eval',en:'EVALUATION',zh:'绝对评审',sub_en:'Scoring all fitness dimensions',sub_zh:'评估全部适应度维度'},
+  {key:'elo',en:'ELO TOURNAMENT',zh:'Elo锦标赛',sub_en:'Swiss tournament pairwise combat',sub_zh:'瑞士制循环对战'},
+  {key:'select',en:'SELECTION',zh:'自然选择',sub_en:'Kill 80%, top 5% elite immune',sub_zh:'淘汰80%，前5%精英免疫'},
+  {key:'cross',en:'CROSSOVER',zh:'交叉重组',sub_en:'Breed survivors, restore population',sub_zh:'繁殖幸存者，恢复种群'},
+  {key:'mutate',en:'MUTATION',zh:'突变',sub_en:'Random evolution on children',sub_zh:'对子代随机进化'},
+  {key:'homogeneity',en:'CLONE CULL',zh:'同质淘汰',sub_en:'Remove clones >60% similar',sub_zh:'清除相似度>60%的克隆体'},
+  {key:'freshblood',en:'FRESH BLOOD',zh:'新鲜血液',sub_en:'Inject new agents every 2 gens',sub_zh:'每2代注入新生力量'},
+  {key:'redteam',en:'RED TEAM',zh:'红队攻击',sub_en:'Adversarial attack on top 5',sub_zh:'对前5名发起对抗攻击'},
+  {key:'debate',en:'DEBATE',zh:'辩论锦标赛',sub_en:'Top candidates argue & clash',sub_zh:'顶级候选人辩论交锋'},
+  {key:'pressure',en:'PRESSURE TEST',zh:'压力测试',sub_en:'Extreme scenario stress test',sub_zh:'极端场景压力测试'},
+  {key:'refine',en:'REFINEMENT',zh:'精炼锻造',sub_en:'Deep-expand the champion',sub_zh:'深度扩展冠军方案'},
+  {key:'baseline',en:'BASELINE COMPARE',zh:'基线对比',sub_en:'Evolved champion vs raw AI',sub_zh:'进化冠军对决原始AI'}
+];
+let agents=[],particles=[],floatTexts=[],killfeed=[],battlelog=[];
+let totalKills=0,currentPhase=0,currentGen=1,warStartTime=0;
+let soldierScale=Math.max(.45,100/TOTAL);
+
+/* ---------- SECTION: I18N ---------- */
+let lang=localStorage.getItem('evohive-lang')||'en';
+const I18N={
+  phase:{en:'PHASE',zh:'阶段'},alive:{en:'ALIVE',zh:'存活'},gen:{en:'GEN',zh:'代数'},
+  kills:{en:'KILLS',zh:'击杀'},factions:{en:'FACTIONS',zh:'阵营'},killfeed:{en:'KILL FEED',zh:'击杀通知'},
+  champion:{en:'CHAMPION',zh:'冠军'},duration:{en:'DURATION',zh:'耗时'},totalKills:{en:'TOTAL KILLS',zh:'总击杀'},
+  survivors:{en:'SURVIVORS',zh:'幸存者'},generations:{en:'GENERATIONS',zh:'进化代数'},
+  apiCalls:{en:'API CALLS',zh:'API调用'},cost:{en:'EST. COST',zh:'预估成本'},
+  factionBreakdown:{en:'FACTION BREAKDOWN',zh:'阵营战绩'},topFighters:{en:'TOP FIGHTERS',zh:'最强战士'},
+  evolvedAnswer:{en:'EVOLVED ANSWER',zh:'进化答案'},restart:{en:'RESTART WAR',zh:'重新开战'},
+  landed:{en:'LANDED',zh:'着陆'},eliminated:{en:'ELIMINATED',zh:'已淘汰'},
+  defeated:{en:'defeated',zh:'击败了'},mutated:{en:'MUTATED',zh:'已突变'},
+  upgraded:{en:'UPGRADE',zh:'升级'},fused:{en:'FUSED',zh:'融合'},
+  targetLocked:{en:'TARGET LOCKED',zh:'目标锁定'},
+  evolutionComplete:{en:'EVOLUTION COMPLETE',zh:'进化完成'},
+  vsBaseline:{en:'vs BASELINE',zh:'对决基线'},
+  hint:{en:'Scroll to zoom · Drag to pan · Click agent for details',zh:'滚轮缩放 · 拖拽平移 · 点击查看详情'},
+};
+function t(key){return I18N[key]?.[lang]||key}
+function updateI18N(){
+  document.querySelectorAll('[data-i18n]').forEach(el=>{
+    el.textContent=t(el.dataset.i18n);
+  });
+  localStorage.setItem('evohive-lang',lang);
+}
+
+/* ---------- SECTION: CANVAS & RESIZE ---------- */
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+let W,H,originX,originY,baseScale=1;
+function resize(){
+  W=cv.width=cv.parentElement.clientWidth;
+  H=cv.height=cv.parentElement.clientHeight;
+  // Fit entire 28x28 grid inside viewport; padding tiles fill remaining space
+  const gridW=COLS*TW;
+  const gridH=ROWS*TH;
+  const scaleX=W/gridW, scaleY=H/gridH;
+  baseScale=Math.min(scaleX,scaleY)*0.95;
+  originX=W/2;
+  originY=H/2;
+}
+window.addEventListener('resize',resize);
+resize();
+
+/* ---------- SECTION: ISOMETRIC HELPERS ---------- */
+function toIso(gx,gy){
+  // Flat rectangular mapping centered at grid midpoint
+  const cx=(gx-COLS/2)*TW;
+  const cy=(gy-ROWS/2)*TH;
+  return {x:cx,y:cy};
+}
+function toScreen(gx,gy){
+  const iso=toIso(gx,gy);
+  return {
+    x:originX + (iso.x)*baseScale*camZoom + camX,
+    y:originY + (iso.y)*baseScale*camZoom + camY
+  };
+}
+function toGrid(sx,sy){
+  const ix=(sx - originX - camX)/(baseScale*camZoom);
+  const iy=(sy - originY - camY)/(baseScale*camZoom);
+  const gx=ix/TW + COLS/2;
+  const gy=iy/TH + ROWS/2;
+  return {gx,gy};
+}
+function gridDist(a,b){return Math.hypot(a.gx-b.gx,a.gy-b.gy)}
+
+/* ---------- SECTION: TERRAIN ---------- */
+const TILE_GRASS=0,TILE_DIRT=1,TILE_WATER=2,TILE_CONCRETE=3;
+const TILE_COLORS={
+  [TILE_GRASS]:['#2d5a1e','#336b22','#2a5219','#305e1f'],
+  [TILE_DIRT]:['#5a4a32','#4d3e28','#63523a','#564430'],
+  [TILE_WATER]:['#1a3a5c','#1e4068','#163252','#1b3c60'],
+  [TILE_CONCRETE]:['#4a4a4a','#525252','#434343','#4e4e4e']
+};
+let terrain=[],details=[];
+function genTerrain(){
+  terrain=[];details=[];
+  const mid=COLS/2;
+  for(let r=0;r<ROWS;r++){
+    terrain[r]=[];
+    for(let c=0;c<COLS;c++){
+      const d=Math.hypot(c-mid,r-mid);
+      if(d<3) terrain[r][c]=TILE_CONCRETE;
+      else if(d>mid-2&&Math.random()<.3) terrain[r][c]=TILE_WATER;
+      else if(Math.random()<.15) terrain[r][c]=TILE_DIRT;
+      else terrain[r][c]=TILE_GRASS;
+    }
+  }
+  // scatter detail objects (trees, rocks)
+  for(let i=0;i<80;i++){
+    const gx=Math.random()*COLS,gy=Math.random()*ROWS;
+    const d=Math.hypot(gx-mid,gy-mid);
+    if(d>4&&d<mid-1){
+      details.push({gx,gy,type:Math.random()<.6?'tree':'rock'});
+    }
+  }
+}
+genTerrain();
+
+function drawTile(x,y,color,sc){
+  const hw=TW/2*sc,hh=TH/2*sc;
+  ctx.fillStyle=color;
+  ctx.fillRect(x-hw,y-hh,hw*2,hh*2);
+  ctx.strokeStyle='rgba(0,0,0,.1)';ctx.lineWidth=.5;
+  ctx.strokeRect(x-hw,y-hh,hw*2,hh*2);
+}
+
+function drawTerrain(){
+  const pad=10;
+  const sc=baseScale*camZoom;
+  for(let r=-pad;r<ROWS+pad;r++){
+    for(let c=-pad;c<COLS+pad;c++){
+      const s=toScreen(c,r);
+      // frustum cull
+      if(s.x<-TW*sc||s.x>W+TW*sc||s.y<-TH*sc||s.y>H+TH*sc) continue;
+      let tileType=TILE_GRASS;
+      if(r>=0&&r<ROWS&&c>=0&&c<COLS) tileType=terrain[r][c];
+      const colors=TILE_COLORS[tileType];
+      const ci=((c&1)^(r&1))+((c+r)%2)*2;
+      let clr=colors[Math.abs(ci)%colors.length];
+      // darken out-of-bounds tiles slightly
+      if(r<0||r>=ROWS||c<0||c>=COLS){
+        clr=darken(clr,.7);
+      }
+      drawTile(s.x,s.y,clr,sc);
+    }
+  }
+  // draw details
+  for(const d of details){
+    const s=toScreen(d.gx,d.gy);
+    if(s.x<-40||s.x>W+40||s.y<-40||s.y>H+40) continue;
+    if(d.type==='tree') drawTree(s.x,s.y,sc);
+    else drawRock(s.x,s.y,sc);
+  }
+}
+
+function drawTree(x,y,sc){
+  const s=sc*.8;
+  // trunk
+  ctx.fillStyle='#3d2b1f';
+  ctx.fillRect(x-1*s,y-6*s,2*s,6*s);
+  // canopy
+  ctx.fillStyle='#1a4a0e';
+  ctx.beginPath();ctx.arc(x,y-9*s,5*s,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#236b14';
+  ctx.beginPath();ctx.arc(x-1*s,y-10*s,3.5*s,0,Math.PI*2);ctx.fill();
+}
+function drawRock(x,y,sc){
+  const s=sc*.7;
+  ctx.fillStyle='#5a5a5a';
+  ctx.beginPath();
+  ctx.moveTo(x-4*s,y);ctx.lineTo(x-2*s,y-4*s);ctx.lineTo(x+3*s,y-3*s);
+  ctx.lineTo(x+5*s,y);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#6a6a6a';
+  ctx.beginPath();
+  ctx.moveTo(x-2*s,y-4*s);ctx.lineTo(x,y-6*s);ctx.lineTo(x+3*s,y-3*s);ctx.closePath();ctx.fill();
+}
+function darken(hex,f){
+  const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+  return `rgb(${r*f|0},${g*f|0},${b*f|0})`;
+}
+
+/* ---------- SECTION: SPRITE RENDERING ---------- */
+function getTier(a){
+  if(a.elo>=1300&&a.mutated) return 5;
+  if(a.elo>=1200||a.gen>=3) return 4;
+  if(a.elo>=1100||a.gen>=2) return 3;
+  if(a.elo>=1000) return 2;
+  return 1;
+}
+
+function drawSoldier(x,y,color,tier,sc,alive,facing,selected){
+  const s=sc*soldierScale;
+  if(!alive){ctx.globalAlpha=.3;}
+  // shadow
+  ctx.fillStyle='rgba(0,0,0,.3)';
+  ctx.beginPath();ctx.ellipse(x,y+2*s,6*s,2*s,0,0,Math.PI*2);ctx.fill();
+
+  if(tier<=2){
+    // T1/T2: humanoid soldier
+    const armorW=tier===2?1.3:1;
+    // legs
+    ctx.fillStyle=darken(color,.5);
+    ctx.fillRect(x-3*s,y-2*s,2*s,4*s);
+    ctx.fillRect(x+1*s,y-2*s,2*s,4*s);
+    // body
+    ctx.fillStyle=color;
+    ctx.fillRect(x-4*s*armorW,y-10*s,8*s*armorW,8*s);
+    // head
+    ctx.fillStyle='#deb887';
+    ctx.fillRect(x-2*s,y-14*s,4*s,4*s);
+    // helmet
+    ctx.fillStyle=tier===2?darken(color,.7):darken(color,.8);
+    ctx.fillRect(x-3*s,y-16*s,6*s,3*s);
+    if(tier===2){
+      // shoulder pads
+      ctx.fillStyle=darken(color,.6);
+      ctx.fillRect(x-6*s,y-10*s,2*s,4*s);
+      ctx.fillRect(x+4*s,y-10*s,2*s,4*s);
+      // visor
+      ctx.fillStyle='#ff4444';
+      ctx.fillRect(x-1*s,y-14*s,3*s,1*s);
+    }
+    // weapon
+    ctx.fillStyle='#888';
+    if(facing>0) ctx.fillRect(x+4*s*armorW,y-8*s,6*s,1.5*s);
+    else ctx.fillRect(x-10*s*armorW,y-8*s,6*s,1.5*s);
+  } else if(tier===3){
+    // T3: mech
+    // legs (thicker)
+    ctx.fillStyle=darken(color,.4);
+    ctx.fillRect(x-4*s,y-3*s,3*s,6*s);
+    ctx.fillRect(x+1*s,y-3*s,3*s,6*s);
+    // body (box)
+    ctx.fillStyle=color;
+    ctx.fillRect(x-5*s,y-12*s,10*s,10*s);
+    // cockpit
+    ctx.fillStyle='#00ff41';
+    ctx.fillRect(x-2*s,y-10*s,4*s,3*s);
+    // antenna
+    ctx.fillStyle='#ccc';
+    ctx.fillRect(x+3*s,y-16*s,1*s,4*s);
+    ctx.fillStyle='#ff0';
+    ctx.fillRect(x+2.5*s,y-17*s,2*s,2*s);
+    // arms/guns
+    ctx.fillStyle='#888';
+    ctx.fillRect(x-9*s,y-10*s,4*s,2*s);
+    ctx.fillRect(x+5*s,y-10*s,4*s,2*s);
+  } else if(tier===4){
+    // T4: tank
+    // treads
+    ctx.fillStyle='#333';
+    ctx.fillRect(x-8*s,y-2*s,16*s,4*s);
+    ctx.fillStyle='#555';
+    for(let i=0;i<4;i++) ctx.fillRect(x-7*s+i*4*s,y-1*s,2*s,2*s);
+    // hull
+    ctx.fillStyle=color;
+    ctx.beginPath();
+    ctx.moveTo(x-7*s,y-3*s);ctx.lineTo(x-5*s,y-10*s);ctx.lineTo(x+5*s,y-10*s);
+    ctx.lineTo(x+7*s,y-3*s);ctx.closePath();ctx.fill();
+    // turret
+    ctx.fillStyle=darken(color,.7);
+    ctx.fillRect(x-3*s,y-13*s,6*s,4*s);
+    // barrel
+    ctx.fillStyle='#888';
+    const bx=facing>0?3*s:-9*s;
+    ctx.fillRect(x+bx,y-12*s,8*s,2*s);
+  } else {
+    // T5: drone/aircraft
+    // hover glow
+    ctx.fillStyle=color+'44';
+    ctx.beginPath();ctx.ellipse(x,y+1*s,8*s,3*s,0,0,Math.PI*2);ctx.fill();
+    // body (diamond)
+    ctx.fillStyle=color;
+    ctx.beginPath();
+    ctx.moveTo(x,y-14*s);ctx.lineTo(x+7*s,y-7*s);ctx.lineTo(x,y);ctx.lineTo(x-7*s,y-7*s);
+    ctx.closePath();ctx.fill();
+    // wings
+    ctx.fillStyle=darken(color,.6);
+    ctx.beginPath();
+    ctx.moveTo(x-7*s,y-7*s);ctx.lineTo(x-12*s,y-4*s);ctx.lineTo(x-4*s,y-4*s);ctx.closePath();ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(x+7*s,y-7*s);ctx.lineTo(x+12*s,y-4*s);ctx.lineTo(x+4*s,y-4*s);ctx.closePath();ctx.fill();
+    // cockpit
+    ctx.fillStyle='#00ffff88';
+    ctx.beginPath();ctx.ellipse(x,y-8*s,2*s,3*s,0,0,Math.PI*2);ctx.fill();
+    // thrusters
+    const pulse=Math.sin(Date.now()*.01)*s;
+    ctx.fillStyle='#ff6600';
+    ctx.beginPath();ctx.ellipse(x-3*s,y+pulse,1.5*s,1.5*s,0,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.ellipse(x+3*s,y+pulse,1.5*s,1.5*s,0,0,Math.PI*2);ctx.fill();
+  }
+
+  if(!alive){ctx.globalAlpha=1;return;}
+
+  // color indicator dot (pulsing)
+  const dotR=3*sc;
+  const pulse2=.5+.5*Math.sin(Date.now()*.005+x);
+  ctx.fillStyle=color;
+  ctx.globalAlpha=.5+.4*pulse2;
+  ctx.beginPath();ctx.arc(x,y-18*s,dotR,0,Math.PI*2);ctx.fill();
+  ctx.globalAlpha=1;
+
+  // selection ring
+  if(selected){
+    ctx.strokeStyle=color;ctx.lineWidth=2;
+    ctx.beginPath();ctx.ellipse(x,y+1*s,8*s,3*s,0,0,Math.PI*2);ctx.stroke();
+  }
+}
+
+function drawParachute(x,y,color,sc){
+  const s=sc*soldierScale;
+  // canopy
+  ctx.fillStyle=color+'aa';
+  ctx.beginPath();
+  ctx.arc(x,y-28*s,10*s,Math.PI,0);ctx.fill();
+  // lines
+  ctx.strokeStyle=color+'88';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(x-10*s,y-28*s);ctx.lineTo(x-2*s,y-16*s);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(x+10*s,y-28*s);ctx.lineTo(x+2*s,y-16*s);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(x,y-38*s);ctx.lineTo(x,y-16*s);ctx.stroke();
+}
+
+function drawBoss(x,y,sc){
+  const s=sc*1.8;
+  // shadow
+  ctx.fillStyle='rgba(0,0,0,.4)';
+  ctx.beginPath();ctx.ellipse(x,y+3*s,12*s,4*s,0,0,Math.PI*2);ctx.fill();
+  // legs
+  ctx.fillStyle='#444';
+  ctx.fillRect(x-6*s,y-3*s,4*s,6*s);
+  ctx.fillRect(x+2*s,y-3*s,4*s,6*s);
+  // body
+  ctx.fillStyle='#666';
+  ctx.fillRect(x-8*s,y-16*s,16*s,14*s);
+  // head
+  ctx.fillStyle='#555';
+  ctx.fillRect(x-4*s,y-22*s,8*s,6*s);
+  // eyes
+  ctx.fillStyle='#ff0000';
+  ctx.fillRect(x-3*s,y-20*s,2*s,2*s);
+  ctx.fillRect(x+1*s,y-20*s,2*s,2*s);
+  // label
+  ctx.fillStyle='#ff4444';
+  ctx.font=`${10*sc}px 'Press Start 2P'`;
+  ctx.textAlign='center';
+  ctx.fillText('BASELINE',x,y-26*s);
+}
+
+/* ---------- SECTION: AGENT CLASS ---------- */
+function makeAgent(id,factionIdx){
+  const f=FACTIONS[factionIdx];
+  const mid=COLS/2;
+  // spawn around edges
+  const angle=(factionIdx/FACTIONS.length)*Math.PI*2+Math.random()*.5;
+  const dist=mid*0.85;
+  return {
+    id,faction:factionIdx,color:f.color,factionName:f.name,
+    gx:mid+Math.cos(angle)*dist+Math.random()*4-2,
+    gy:mid+Math.sin(angle)*dist+Math.random()*4-2,
+    elo:1000+Math.random()*50-25,
+    fitness:{feasibility:Math.random()*30+60,innovation:Math.random()*30+55,specificity:Math.random()*30+50,cost:Math.random()*30+60},
+    alive:true,hp:100,
+    gen:1,mutated:false,parents:null,kills:0,
+    facing:Math.random()>.5?1:-1,
+    chute:true,chuteY:-200-Math.random()*300,
+    targetGx:0,targetGy:0,
+    prevRank:999,rank:999,rankChanged:0
+  };
+}
+function initPopulation(){
+  agents=[];
+  const perFaction=Math.ceil(TOTAL/FACTIONS.length);
+  let id=0;
+  for(let f=0;f<FACTIONS.length;f++){
+    FACTIONS[f].soldiers=0;
+    const count=Math.min(perFaction,TOTAL-id);
+    for(let i=0;i<count;i++){
+      agents.push(makeAgent(id++,f));
+      FACTIONS[f].soldiers++;
+    }
+  }
+}
+function aliveAgents(){return agents.filter(a=>a.alive)}
+function updateRanks(){
+  const alive=aliveAgents().sort((a,b)=>b.elo-a.elo);
+  alive.forEach((a,i)=>{
+    a.prevRank=a.rank;
+    a.rank=i+1;
+    if(a.prevRank!==a.rank&&a.prevRank!==999) a.rankChanged=Date.now();
+  });
+}
+
+/* ---------- SECTION: EFFECTS SYSTEM ---------- */
+const MAX_PARTICLES=800;
+function addParticle(x,y,color,count,speed,life){
+  for(let i=0;i<count;i++){
+    if(particles.length>=MAX_PARTICLES) break;
+    const a=Math.random()*Math.PI*2;
+    particles.push({x,y,vx:Math.cos(a)*speed*(Math.random()+.5),vy:Math.sin(a)*speed*(Math.random()+.5)-speed*.5,
+      life,maxLife:life,color,size:2+Math.random()*3});
+  }
+}
+function addFloatText(x,y,text,color,size){
+  floatTexts.push({x,y,text,color,size:size||12,life:80,maxLife:80});
+}
+function addKillFeed(msg,color){
+  killfeed.unshift({msg,color,time:Date.now()});
+  if(killfeed.length>20) killfeed.pop();
+}
+function addBattleLog(msg){
+  const mins=((Date.now()-warStartTime)/60000)|0;
+  const secs=((Date.now()-warStartTime)/1000%60)|0;
+  battlelog.unshift({msg,time:`${mins}:${String(secs).padStart(2,'0')}`});
+  if(battlelog.length>50) battlelog.pop();
+}
+function updateParticles(){
+  let writeIdx=0;
+  for(let i=0;i<particles.length;i++){
+    const p=particles[i];
+    p.x+=p.vx;p.y+=p.vy;p.vy+=.15;p.life--;
+    if(p.life>0) particles[writeIdx++]=p;
+  }
+  particles.length=writeIdx;
+}
+function drawParticles(){
+  for(const p of particles){
+    ctx.globalAlpha=p.life/p.maxLife;
+    ctx.fillStyle=p.color;
+    ctx.fillRect(p.x-p.size/2,p.y-p.size/2,p.size,p.size);
+  }
+  ctx.globalAlpha=1;
+}
+function drawFloatTexts(){
+  let writeIdx=0;
+  for(let i=0;i<floatTexts.length;i++){
+    const ft=floatTexts[i];
+    const progress=1-ft.life/ft.maxLife;
+    ctx.globalAlpha=1-progress;
+    ctx.fillStyle=ft.color;
+    ctx.font=`bold ${ft.size}px 'Press Start 2P'`;
+    ctx.textAlign='center';
+    ctx.fillText(ft.text,ft.x,ft.y-progress*40);
+    ft.life--;
+    if(ft.life>0) floatTexts[writeIdx++]=ft;
+  }
+  floatTexts.length=writeIdx;
+  ctx.globalAlpha=1;
+}
+
+/* ---------- SECTION: CAMERA SYSTEM ---------- */
+let camX=0,camY=0,camZoom=1;
+let camTargetX=0,camTargetY=0,camTargetZoom=1;
+// Auto-cam disabled — user controls camera via mouse wheel & drag
+function camPanTo(){}
+function camReset(){}
+function updateCamera(){
+  camX+=(camTargetX-camX)*.12;
+  camY+=(camTargetY-camY)*.12;
+  camZoom+=(camTargetZoom-camZoom)*.12;
+}
+// Mouse wheel zoom (centered on cursor)
+const cvCam=document.getElementById('cv');
+cvCam.addEventListener('wheel',e=>{
+  e.preventDefault();
+  const rect=cvCam.getBoundingClientRect();
+  const mx=e.clientX-rect.left, my=e.clientY-rect.top;
+  const oldZoom=camTargetZoom;
+  const zoomFactor=e.deltaY<0?1.1:1/1.1;
+  camTargetZoom=Math.max(.85,Math.min(5,camTargetZoom*zoomFactor));
+  // adjust pan so zoom centers on cursor
+  const ratio=camTargetZoom/oldZoom;
+  const dx=mx-originX-camTargetX;
+  const dy=my-originY-camTargetY;
+  camTargetX-=dx*(ratio-1);
+  camTargetY-=dy*(ratio-1);
+  // clamp pan so terrain always covers viewport
+  clampPan();
+},{passive:false});
+// Clamp pan so terrain edge never leaves viewport
+function clampPan(){
+  const sc=baseScale*camTargetZoom;
+  const halfGridW=(COLS/2)*TW*sc;
+  const halfGridH=(ROWS/2)*TH*sc;
+  const pad=10*TW*sc; // match terrain pad
+  const maxX=halfGridW+pad-W/2;
+  const maxY=halfGridH+pad-H/2;
+  if(maxX>0){
+    camTargetX=Math.max(-maxX,Math.min(maxX,camTargetX));
+  } else {camTargetX=0;}
+  if(maxY>0){
+    camTargetY=Math.max(-maxY,Math.min(maxY,camTargetY));
+  } else {camTargetY=0;}
+}
+// Mouse drag pan
+let wasDragged=false;
+cvCam.addEventListener('mousedown',e=>{
+  dragging=true;wasDragged=false;dragStartX=e.clientX;dragStartY=e.clientY;
+  dragCamX=camTargetX;dragCamY=camTargetY;
+  cvCam.style.cursor='grabbing';
+});
+window.addEventListener('mousemove',e=>{
+  if(!dragging) return;
+  const dx=e.clientX-dragStartX,dy=e.clientY-dragStartY;
+  if(Math.abs(dx)>3||Math.abs(dy)>3) wasDragged=true;
+  camTargetX=dragCamX+dx;
+  camTargetY=dragCamY+dy;
+  clampPan();
+});
+window.addEventListener('mouseup',()=>{
+  dragging=false;cvCam.style.cursor='default';
+});
+// Touch support
+let touchStartDist=0,touchStartZoom=1;
+cvCam.addEventListener('touchstart',e=>{
+  if(e.touches.length===1){
+    dragging=true;wasDragged=false;
+    dragStartX=e.touches[0].clientX;dragStartY=e.touches[0].clientY;
+    dragCamX=camTargetX;dragCamY=camTargetY;
+  } else if(e.touches.length===2){
+    dragging=false;
+    touchStartDist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+    touchStartZoom=camTargetZoom;
+  }
+},{passive:true});
+cvCam.addEventListener('touchmove',e=>{
+  e.preventDefault();
+  if(e.touches.length===1&&dragging){
+    const dx=e.touches[0].clientX-dragStartX,dy=e.touches[0].clientY-dragStartY;
+    if(Math.abs(dx)>3||Math.abs(dy)>3) wasDragged=true;
+    camTargetX=dragCamX+dx;camTargetY=dragCamY+dy;
+    clampPan();
+  } else if(e.touches.length===2){
+    const dist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+    camTargetZoom=Math.max(.85,Math.min(5,touchStartZoom*(dist/touchStartDist)));
+    clampPan();
+  }
+},{passive:false});
+cvCam.addEventListener('touchend',()=>{dragging=false;},{passive:true});
+
+/* ---------- SECTION: SCREEN EFFECTS ---------- */
+let shakeAmount=0,flashColor=null,flashAlpha=0;
+function screenShake(amt){shakeAmount=Math.max(shakeAmount,amt);}
+function screenFlash(color,alpha){flashColor=color;flashAlpha=alpha;}
+function updateScreenFx(){
+  if(shakeAmount>0) shakeAmount*=.9;
+  if(shakeAmount<.3) shakeAmount=0;
+  if(flashAlpha>0) flashAlpha-=.03;
+}
+function applyScreenFx(){
+  if(flashColor&&flashAlpha>0){
+    ctx.fillStyle=flashColor;
+    ctx.globalAlpha=flashAlpha;
+    ctx.fillRect(0,0,W,H);
+    ctx.globalAlpha=1;
+  }
+}
+// Cinematic bars
+function showCinematic(){
+  document.getElementById('cine-top').style.height='40px';
+  document.getElementById('cine-bot').style.height='40px';
+}
+function hideCinematic(){
+  document.getElementById('cine-top').style.height='0';
+  document.getElementById('cine-bot').style.height='0';
+}
+// Phase announcement
+function announce(titleKey,subKey){
+  return new Promise(resolve=>{
+    const phase=PHASES[currentPhase]||{en:titleKey,zh:titleKey,sub_en:subKey||'',sub_zh:subKey||''};
+    const el=document.getElementById('announce');
+    const tEl=document.getElementById('announce-title');
+    const sEl=document.getElementById('announce-sub');
+    tEl.textContent=lang==='zh'?phase.zh:phase.en;
+    sEl.textContent=lang==='zh'?phase.sub_zh:phase.sub_en;
+    document.getElementById('phase-name').textContent=lang==='zh'?phase.zh:phase.en;
+    document.getElementById('phase-sub').textContent=lang==='zh'?phase.sub_zh:phase.sub_en;
+    el.style.opacity='1';
+    showCinematic();
+    screenFlash('#ffffff',.15);
+    setTimeout(()=>{el.style.opacity='0';hideCinematic();resolve();},1000);
+  });
+}
+function sleep(ms){
+  const delay=Math.max(15,ms/simSpeed); // minimum 15ms so effects stay visible
+  return new Promise(r=>{
+    if(simPaused){
+      const check=setInterval(()=>{if(!simPaused){clearInterval(check);setTimeout(r,delay);}},50);
+    } else if(delay>=30){
+      // For longer sleeps, align to next animation frame to reduce jank
+      const start=performance.now();
+      const step=()=>{
+        if(performance.now()-start>=delay) r();
+        else requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    } else {setTimeout(r,delay);}
+  });
+}
+
+/* ---------- SECTION: EXTERNAL ENTITIES ---------- */
+let scanTarget=null, redMonsters=[], meteors=[], forgeActive=false, forgePos={gx:COLS/2,gy:ROWS/2};
+let stormZone={cx:COLS/2,cy:ROWS/2,radius:COLS/2+2,targetRadius:5};
+
+function drawScanBeam(){
+  if(!scanTarget) return;
+  const a=scanTarget;
+  const s=toScreen(a.gx,a.gy);
+  const sc=baseScale*camZoom;
+  const t=Date.now()*.003;
+  const beamW=14*sc;
+  const topY=s.y-200*sc;
+  // vertical light column — gradient fading upward
+  const grad=ctx.createLinearGradient(s.x,s.y,s.x,topY);
+  grad.addColorStop(0,'rgba(0,255,180,.25)');
+  grad.addColorStop(.3,'rgba(0,255,180,.12)');
+  grad.addColorStop(1,'rgba(0,255,180,0)');
+  ctx.fillStyle=grad;
+  ctx.beginPath();
+  ctx.moveTo(s.x-beamW,topY);ctx.lineTo(s.x+beamW,topY);
+  ctx.lineTo(s.x+beamW*.6,s.y);ctx.lineTo(s.x-beamW*.6,s.y);
+  ctx.closePath();ctx.fill();
+  // ground circle glow
+  const gGrad=ctx.createRadialGradient(s.x,s.y,0,s.x,s.y,18*sc);
+  gGrad.addColorStop(0,'rgba(0,255,180,.3)');gGrad.addColorStop(1,'rgba(0,255,180,0)');
+  ctx.fillStyle=gGrad;
+  ctx.beginPath();ctx.ellipse(s.x,s.y+2*sc,18*sc,6*sc,0,0,Math.PI*2);ctx.fill();
+  // spinning scan ring on ground
+  ctx.strokeStyle='rgba(0,255,180,.5)';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.ellipse(s.x,s.y+2*sc,14*sc,5*sc,0,t%(Math.PI*2),(t+Math.PI*1.2)%(Math.PI*2));ctx.stroke();
+  ctx.beginPath();ctx.ellipse(s.x,s.y+2*sc,14*sc,5*sc,0,(t+Math.PI)%(Math.PI*2),(t+Math.PI+Math.PI*1.2)%(Math.PI*2));ctx.stroke();
+  // horizontal scan line sweeping up and down
+  const sweepY=s.y-20*sc+Math.sin(t*2)*20*sc;
+  ctx.strokeStyle='rgba(0,255,255,.4)';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(s.x-12*sc,sweepY);ctx.lineTo(s.x+12*sc,sweepY);ctx.stroke();
+  // data readout text above
+  ctx.fillStyle='rgba(0,255,180,.9)';
+  ctx.font=`${7*sc}px 'Share Tech Mono'`;
+  ctx.textAlign='center';
+  const fit=((a.fitness.feasibility+a.fitness.innovation+a.fitness.specificity+a.fitness.cost)/4);
+  ctx.fillText(`SCANNING...`,s.x,s.y-30*sc);
+  ctx.fillText(`FIT: ${fit.toFixed(1)}`,s.x,s.y-22*sc);
+  ctx.lineWidth=1;
+}
+
+function drawRedMonster(m){
+  const s=toScreen(m.gx,m.gy);
+  const sc=baseScale*camZoom*1.2;
+  // body
+  ctx.fillStyle='#cc2222';
+  ctx.beginPath();
+  ctx.moveTo(s.x,s.y-14*sc);ctx.lineTo(s.x+8*sc,s.y);ctx.lineTo(s.x-8*sc,s.y);ctx.closePath();ctx.fill();
+  // spikes
+  ctx.fillStyle='#ff4444';
+  for(let i=-2;i<=2;i++){
+    ctx.beginPath();
+    ctx.moveTo(s.x+i*3*sc,s.y-14*sc);
+    ctx.lineTo(s.x+i*3*sc-1*sc,s.y-18*sc);
+    ctx.lineTo(s.x+i*3*sc+1*sc,s.y-18*sc);
+    ctx.closePath();ctx.fill();
+  }
+  // eyes
+  ctx.fillStyle='#ffff00';
+  ctx.fillRect(s.x-4*sc,s.y-10*sc,2*sc,2*sc);
+  ctx.fillRect(s.x+2*sc,s.y-10*sc,2*sc,2*sc);
+}
+
+function drawMeteor(m){
+  const s={x:m.sx,y:m.sy};
+  const sc=baseScale*camZoom;
+  // trail
+  ctx.strokeStyle='#ff6600';ctx.lineWidth=3*sc;
+  ctx.beginPath();ctx.moveTo(s.x,s.y);ctx.lineTo(s.x+10*sc,s.y-20*sc);ctx.stroke();
+  ctx.strokeStyle='#ffaa00';ctx.lineWidth=1.5*sc;
+  ctx.beginPath();ctx.moveTo(s.x,s.y);ctx.lineTo(s.x+15*sc,s.y-30*sc);ctx.stroke();
+  // body
+  ctx.fillStyle='#ff4400';
+  ctx.beginPath();ctx.arc(s.x,s.y,5*sc,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#ffcc00';
+  ctx.beginPath();ctx.arc(s.x,s.y,3*sc,0,Math.PI*2);ctx.fill();
+  ctx.lineWidth=1;
+}
+
+function drawForge(){
+  if(!forgeActive) return;
+  const s=toScreen(forgePos.gx,forgePos.gy);
+  const sc=baseScale*camZoom;
+  const pulse=Math.sin(Date.now()*.005)*3*sc;
+  // golden glow
+  const grad=ctx.createRadialGradient(s.x,s.y-10*sc,0,s.x,s.y-10*sc,30*sc);
+  grad.addColorStop(0,'rgba(255,215,0,.4)');grad.addColorStop(.5,'rgba(255,165,0,.15)');grad.addColorStop(1,'rgba(255,215,0,0)');
+  ctx.fillStyle=grad;
+  ctx.beginPath();ctx.arc(s.x,s.y-10*sc,30*sc+pulse,0,Math.PI*2);ctx.fill();
+  // anvil
+  ctx.fillStyle='#555';
+  ctx.fillRect(s.x-8*sc,s.y-6*sc,16*sc,4*sc);
+  ctx.fillRect(s.x-4*sc,s.y-2*sc,8*sc,6*sc);
+  // golden ring
+  ctx.strokeStyle='#ffd700';ctx.lineWidth=2*sc;
+  ctx.beginPath();ctx.arc(s.x,s.y-10*sc,15*sc+pulse,0,Math.PI*2);ctx.stroke();
+  ctx.lineWidth=1;
+  // sparks
+  if(Math.random()<.3){
+    addParticle(s.x+(Math.random()-0.5)*20*sc,s.y-15*sc,'#ffd700',2,2*sc,30);
+  }
+}
+
+function drawStormZone(){
+  const sc=baseScale*camZoom;
+  const s=toScreen(stormZone.cx,stormZone.cy);
+  const r=stormZone.radius*TW*sc/2;
+  // danger zone outside
+  ctx.save();
+  ctx.beginPath();ctx.rect(0,0,W,H);
+  ctx.arc(s.x,s.y,r,0,Math.PI*2,true);ctx.closePath();
+  ctx.fillStyle='rgba(200,0,0,.08)';ctx.fill();
+  ctx.restore();
+  // border
+  ctx.strokeStyle='rgba(255,50,50,.5)';ctx.lineWidth=2;ctx.setLineDash([8,4]);
+  ctx.beginPath();ctx.arc(s.x,s.y,r,0,Math.PI*2);ctx.stroke();
+  ctx.setLineDash([]);ctx.lineWidth=1;
+}
+
+/* ---------- SECTION: UI DRAWING ---------- */
+let selectedAgent=null;
+function updatePhaseTimeline(){
+  const el=document.getElementById('phase-timeline');
+  if(!el) return;
+  el.innerHTML=PHASES.map((p,i)=>{
+    const cls=i<currentPhase?'done':i===currentPhase?'active':'';
+    const label=lang==='zh'?p.zh:p.en;
+    return `<div class="pt-dot ${cls}" title="${label}"></div>`;
+  }).join('');
+}
+let _sidebarDirty=false;let _sidebarTimer=null;
+function updateSidebar(){
+  // Debounce: batch rapid calls into one DOM update per frame
+  _sidebarDirty=true;
+  if(_sidebarTimer) return;
+  _sidebarTimer=requestAnimationFrame(()=>{
+    _sidebarTimer=null;
+    if(!_sidebarDirty) return;
+    _sidebarDirty=false;
+    _updateSidebarNow();
+  });
+}
+function _updateSidebarNow(){
+  const alive=aliveAgents();
+  document.getElementById('st-alive').textContent=alive.length;
+  document.getElementById('st-gen').textContent=currentGen;
+  document.getElementById('st-kills').textContent=totalKills;
+  document.getElementById('alive-counter').textContent=`ALIVE: ${alive.length}`;
+  document.getElementById('gen-counter').textContent=`GEN ${currentGen}`;
+  // factions
+  const fl=document.getElementById('faction-list');
+  let html=`<div class="sb-label" data-i18n="factions">${t('factions')}</div>`;
+  for(let fi=0;fi<FACTIONS.length;fi++){
+    const f=FACTIONS[fi];
+    const fAlive=alive.filter(a=>a.faction===fi);
+    const total=agents.filter(a=>a.faction===fi);
+    const avgElo=fAlive.length?Math.round(fAlive.reduce((s,a)=>s+a.elo,0)/fAlive.length):0;
+    const pct=total.length?Math.round(fAlive.length/total.length*100):0;
+    html+=`<div class="faction-card" data-faction="${f.id}">
+      <div class="faction-dot" style="background:${f.color}"></div>
+      <div class="faction-info">
+        <div class="faction-name" style="color:${f.color}">${f.name}</div>
+        <div class="faction-stats">${fAlive.length}/${total.length} | ELO ${avgElo}</div>
+        <div class="faction-bar"><div class="faction-bar-fill" style="width:${pct}%;background:${f.color}"></div></div>
+      </div>
+    </div>`;
+  }
+  fl.innerHTML=html;
+  // killfeed
+  const kf=document.getElementById('killfeed');
+  kf.innerHTML=killfeed.slice(0,15).map(k=>
+    `<div class="kf-entry" style="border-color:${k.color}">${k.msg}</div>`
+  ).join('');
+  // battlelog
+  const bl=document.getElementById('battlelog');
+  bl.innerHTML=battlelog.slice(0,20).map(b=>
+    `<div class="bl-entry">[${b.time}] <span>${b.msg}</span></div>`
+  ).join('');
+  updatePhaseTimeline();
+}
+
+let _cachedTopRanked=[];let _rankCacheGen=-1;
+function drawRankBadges(){
+  // Refresh cache only when generation or rank changes
+  const cacheKey=currentGen*1000+totalKills;
+  if(cacheKey!==_rankCacheGen){
+    _cachedTopRanked=aliveAgents().sort((a,b)=>a.rank-b.rank).slice(0,5);
+    _rankCacheGen=cacheKey;
+  }
+  const sc=baseScale*camZoom;
+  for(let i=0;i<_cachedTopRanked.length;i++){
+    const a=_cachedTopRanked[i];
+    if(!a.alive) continue;
+    const s=toScreen(a.gx,a.gy);
+    const tier=getTier(a);
+    const yOff=-22*sc*soldierScale-(tier>=4?8*sc:0);
+    const colors=['#ffd700','#c0c0c0','#cd7f32','#888','#666'];
+    // badge background
+    ctx.fillStyle=colors[i];
+    ctx.beginPath();ctx.arc(s.x,s.y+yOff-8*sc,6*sc,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#000';
+    ctx.font=`bold ${7*sc}px 'Press Start 2P'`;
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(`${i+1}`,s.x,s.y+yOff-8*sc);
+    // rank #1 pulse glow
+    if(i===0){
+      const pulse=.3+.3*Math.sin(Date.now()*.005);
+      ctx.fillStyle=`rgba(255,215,0,${pulse})`;
+      ctx.beginPath();ctx.arc(s.x,s.y+yOff-8*sc,10*sc,0,Math.PI*2);ctx.fill();
+    }
+    // rank change indicator
+    if(a.rankChanged&&Date.now()-a.rankChanged<2000){
+      const diff=a.prevRank-a.rank;
+      if(diff>0){
+        ctx.fillStyle='#00ff41';
+        ctx.font=`${8*sc}px 'Press Start 2P'`;
+        ctx.fillText(`↑${diff}`,s.x+12*sc,s.y+yOff-8*sc);
+      } else if(diff<0){
+        ctx.fillStyle='#ff3333';
+        ctx.font=`${8*sc}px 'Press Start 2P'`;
+        ctx.fillText(`↓${-diff}`,s.x+12*sc,s.y+yOff-8*sc);
+      }
+    }
+  }
+  ctx.textBaseline='alphabetic';
+}
+
+function drawVS(a1,a2){
+  const s1=toScreen(a1.gx,a1.gy),s2=toScreen(a2.gx,a2.gy);
+  const mx=(s1.x+s2.x)/2,my=(s1.y+s2.y)/2;
+  const sc=baseScale*camZoom;
+  // spotlights
+  const g1=ctx.createRadialGradient(s1.x,s1.y,0,s1.x,s1.y,20*sc);
+  g1.addColorStop(0,a1.color+'44');g1.addColorStop(1,'transparent');
+  ctx.fillStyle=g1;ctx.beginPath();ctx.arc(s1.x,s1.y,20*sc,0,Math.PI*2);ctx.fill();
+  const g2=ctx.createRadialGradient(s2.x,s2.y,0,s2.x,s2.y,20*sc);
+  g2.addColorStop(0,a2.color+'44');g2.addColorStop(1,'transparent');
+  ctx.fillStyle=g2;ctx.beginPath();ctx.arc(s2.x,s2.y,20*sc,0,Math.PI*2);ctx.fill();
+  // VS text
+  ctx.fillStyle='#ffd700';
+  ctx.font=`bold ${14*sc}px 'Press Start 2P'`;
+  ctx.textAlign='center';
+  ctx.fillText('VS',mx,my);
+}
+
+function drawProjectile(from,to,color){
+  ctx.strokeStyle=color;ctx.lineWidth=2;
+  ctx.beginPath();ctx.moveTo(from.x,from.y);ctx.lineTo(to.x,to.y);ctx.stroke();
+  ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(to.x,to.y,3,0,Math.PI*2);ctx.fill();
+  ctx.lineWidth=1;
+}
+
+/* ---------- SECTION: SKILL & COMBAT EFFECTS ---------- */
+// Active effects rendered each frame
+const activeEffects=[];
+const MAX_EFFECTS=30;
+
+// Skill definitions by tier
+const SKILL_SETS={
+  1:[{name:'SLASH',color:'#ffffff',type:'melee'},{name:'STAB',color:'#cccccc',type:'melee'},{name:'KICK',color:'#ffaa00',type:'melee'}],
+  2:[{name:'POWER SLASH',color:'#ff6644',type:'melee'},{name:'SHIELD BASH',color:'#44aaff',type:'melee'},{name:'HEAVY BLOW',color:'#ffcc00',type:'melee'}],
+  3:[{name:'LASER',color:'#00ff41',type:'beam'},{name:'MISSILE',color:'#ff6600',type:'projectile'},{name:'EMP',color:'#00ccff',type:'aoe'}],
+  4:[{name:'RAIL GUN',color:'#ff0066',type:'beam'},{name:'CANNON',color:'#ff4400',type:'projectile'},{name:'NAPALM',color:'#ff8800',type:'aoe'}],
+  5:[{name:'ORBITAL',color:'#aa00ff',type:'beam'},{name:'PLASMA',color:'#00ffcc',type:'aoe'},{name:'NUKE',color:'#ffff00',type:'aoe'}]
+};
+
+function getRandomSkill(tier){
+  const skills=SKILL_SETS[Math.min(5,Math.max(1,tier))]||SKILL_SETS[1];
+  return skills[Math.floor(Math.random()*skills.length)];
+}
+
+function addEffect(type,props){
+  if(activeEffects.length>=MAX_EFFECTS) activeEffects.shift();
+  activeEffects.push({type,birth:performance.now(),life:props.life||40,maxLife:props.life||40,...props});
+}
+
+function drawBeam(fx,fy,tx,ty,color,progress,width){
+  const w=width||3;
+  const len=Math.hypot(tx-fx,ty-fy);
+  const cutLen=len*Math.min(1,progress*2);
+  const angle=Math.atan2(ty-fy,tx-fx);
+  const ex=fx+Math.cos(angle)*cutLen, ey=fy+Math.sin(angle)*cutLen;
+  // glow
+  ctx.save();
+  ctx.globalAlpha=0.3*(1-progress);
+  ctx.strokeStyle=color;ctx.lineWidth=w*4;
+  ctx.beginPath();ctx.moveTo(fx,fy);ctx.lineTo(ex,ey);ctx.stroke();
+  // core
+  ctx.globalAlpha=1-progress*0.5;
+  ctx.strokeStyle='#fff';ctx.lineWidth=w;
+  ctx.beginPath();ctx.moveTo(fx,fy);ctx.lineTo(ex,ey);ctx.stroke();
+  // tip spark
+  if(progress<0.6){
+    ctx.fillStyle=color;
+    for(let i=0;i<3;i++){
+      const a=Math.random()*Math.PI*2;
+      const r=Math.random()*8;
+      ctx.fillRect(ex+Math.cos(a)*r,ey+Math.sin(a)*r,2,2);
+    }
+  }
+  ctx.restore();
+}
+
+function drawSlash(x,y,color,progress,facing){
+  ctx.save();
+  ctx.translate(x,y);
+  ctx.scale(facing,1);
+  const startAngle=-Math.PI*0.7;
+  const sweep=Math.PI*1.2*Math.min(1,progress*3);
+  const radius=25+progress*15;
+  // arc trail
+  ctx.globalAlpha=Math.max(0,1-progress*1.5);
+  ctx.strokeStyle=color;ctx.lineWidth=4;
+  ctx.beginPath();ctx.arc(0,-10,radius,startAngle,startAngle+sweep);ctx.stroke();
+  // bright tip
+  ctx.strokeStyle='#fff';ctx.lineWidth=2;
+  ctx.beginPath();ctx.arc(0,-10,radius,startAngle+sweep-0.3,startAngle+sweep);ctx.stroke();
+  // spark at tip
+  if(progress<0.5){
+    const tipAngle=startAngle+sweep;
+    const tx2=Math.cos(tipAngle)*radius, ty2=-10+Math.sin(tipAngle)*radius;
+    ctx.fillStyle=color;
+    for(let i=0;i<4;i++){
+      const a=Math.random()*Math.PI*2;
+      ctx.fillRect(tx2+Math.cos(a)*6,ty2+Math.sin(a)*6,2,2);
+    }
+  }
+  ctx.restore();
+}
+
+function drawAoeBurst(x,y,color,progress){
+  ctx.save();
+  const maxR=50;
+  const r=maxR*progress;
+  // outer ring
+  ctx.globalAlpha=Math.max(0,0.6-progress*0.8);
+  ctx.strokeStyle=color;ctx.lineWidth=3;
+  ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.stroke();
+  // inner fill
+  ctx.globalAlpha=Math.max(0,0.2-progress*0.3);
+  ctx.fillStyle=color;
+  ctx.beginPath();ctx.arc(x,y,r*0.8,0,Math.PI*2);ctx.fill();
+  // shockwave particles
+  if(progress<0.4){
+    ctx.globalAlpha=0.6;
+    ctx.fillStyle='#fff';
+    for(let i=0;i<6;i++){
+      const a=(i/6)*Math.PI*2+progress*3;
+      ctx.fillRect(x+Math.cos(a)*r,y+Math.sin(a)*r,3,3);
+    }
+  }
+  ctx.restore();
+}
+
+function drawShield(x,y,color,progress){
+  ctx.save();
+  const r=20+Math.sin(progress*Math.PI)*5;
+  ctx.globalAlpha=Math.max(0,0.4-progress*0.4);
+  ctx.strokeStyle=color;ctx.lineWidth=2;
+  // hexagonal shield
+  ctx.beginPath();
+  for(let i=0;i<6;i++){
+    const a=(i/6)*Math.PI*2-Math.PI/2;
+    const px=x+Math.cos(a)*r, py=y-8+Math.sin(a)*r*0.7;
+    i===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
+  }
+  ctx.closePath();ctx.stroke();
+  // shimmer
+  ctx.globalAlpha=Math.max(0,0.15-progress*0.15);
+  ctx.fillStyle=color;ctx.fill();
+  ctx.restore();
+}
+
+function drawChainLightning(points,color,progress){
+  if(points.length<2) return;
+  ctx.save();
+  ctx.globalAlpha=Math.max(0,1-progress*1.5);
+  ctx.strokeStyle=color;ctx.lineWidth=2;
+  ctx.beginPath();
+  ctx.moveTo(points[0].x,points[0].y);
+  for(let i=1;i<points.length;i++){
+    // zigzag
+    const mx=(points[i-1].x+points[i].x)/2+(Math.random()-0.5)*20;
+    const my=(points[i-1].y+points[i].y)/2+(Math.random()-0.5)*20;
+    ctx.lineTo(mx,my);
+    ctx.lineTo(points[i].x,points[i].y);
+  }
+  ctx.stroke();
+  // bright core
+  ctx.strokeStyle='#fff';ctx.lineWidth=1;
+  ctx.beginPath();
+  ctx.moveTo(points[0].x,points[0].y);
+  for(let i=1;i<points.length;i++){
+    const mx=(points[i-1].x+points[i].x)/2+(Math.random()-0.5)*12;
+    const my=(points[i-1].y+points[i].y)/2+(Math.random()-0.5)*12;
+    ctx.lineTo(mx,my);
+    ctx.lineTo(points[i].x,points[i].y);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+// Draw energy aura for high-tier agents
+function drawAura(x,y,color,tier,sc){
+  if(tier<3) return;
+  const t=performance.now()*0.003;
+  const r=(tier===3?14:tier===4?18:22)*sc;
+  ctx.save();
+  ctx.globalAlpha=0.08+0.04*Math.sin(t);
+  ctx.fillStyle=color;
+  ctx.beginPath();ctx.arc(x,y-6*sc,r,0,Math.PI*2);ctx.fill();
+  // orbiting dots for T5
+  if(tier>=5){
+    ctx.globalAlpha=0.5;
+    for(let i=0;i<3;i++){
+      const a=t*1.5+i*(Math.PI*2/3);
+      const ox=x+Math.cos(a)*r*0.9, oy=y-6*sc+Math.sin(a)*r*0.5;
+      ctx.fillStyle='#fff';
+      ctx.beginPath();ctx.arc(ox,oy,2*sc,0,Math.PI*2);ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+// Update and draw active effects
+function updateAndDrawEffects(){
+  let writeIdx=0;
+  for(let i=0;i<activeEffects.length;i++){
+    const e=activeEffects[i];
+    e.life--;
+    const progress=1-e.life/e.maxLife;
+    if(e.life<=0){continue;}
+    activeEffects[writeIdx++]=e;
+    if(e.type==='beam') drawBeam(e.fx,e.fy,e.tx,e.ty,e.color,progress,e.width);
+    else if(e.type==='slash') drawSlash(e.x,e.y,e.color,progress,e.facing||1);
+    else if(e.type==='aoe') drawAoeBurst(e.x,e.y,e.color,progress);
+    else if(e.type==='shield') drawShield(e.x,e.y,e.color,progress);
+    else if(e.type==='lightning') drawChainLightning(e.points,e.color,progress);
+  }
+  activeEffects.length=writeIdx;
+}
+
+// Launch a tier-appropriate attack effect between attacker and target screen coords
+function launchAttack(attacker,target,attackerScreen,targetScreen){
+  const tier=getTier(attacker);
+  const skill=getRandomSkill(tier);
+  // Show skill name
+  addFloatText(attackerScreen.x,attackerScreen.y-30,skill.name,skill.color,tier>=3?10:8);
+  if(skill.type==='melee'){
+    addEffect('slash',{x:targetScreen.x,y:targetScreen.y,color:skill.color,facing:attacker.facing,life:25});
+    addParticle(targetScreen.x,targetScreen.y,skill.color,4,3,18);
+  } else if(skill.type==='beam'){
+    addEffect('beam',{fx:attackerScreen.x,fy:attackerScreen.y-12,tx:targetScreen.x,ty:targetScreen.y-8,color:skill.color,width:tier>=4?4:2,life:30});
+    addParticle(targetScreen.x,targetScreen.y,'#fff',3,2,15);
+  } else if(skill.type==='projectile'){
+    addEffect('beam',{fx:attackerScreen.x,fy:attackerScreen.y-10,tx:targetScreen.x,ty:targetScreen.y-8,color:skill.color,width:2,life:20});
+    // explosion on hit at halfway through
+    setTimeout(()=>{addEffect('aoe',{x:targetScreen.x,y:targetScreen.y-5,color:skill.color,life:25});},100);
+  } else if(skill.type==='aoe'){
+    addEffect('aoe',{x:(attackerScreen.x+targetScreen.x)/2,y:(attackerScreen.y+targetScreen.y)/2-10,color:skill.color,life:35});
+    addParticle(targetScreen.x,targetScreen.y,skill.color,6,4,22);
+  }
+  // Hit particles on target
+  addParticle(targetScreen.x,targetScreen.y-5,'#ff3333',3,2,12);
+  screenShake(tier>=4?3:tier>=3?2:1);
+}
+
+// Agent detail popup on click
+const cvEl=document.getElementById('cv');
+cvEl.addEventListener('click',e=>{
+  if(wasDragged) return;
+  const rect=cvEl.getBoundingClientRect();
+  const mx=e.clientX-rect.left, my=e.clientY-rect.top;
+  const detailEl=document.getElementById('agent-detail');
+  selectedAgent=null;
+  for(const a of agents){
+    if(!a.alive) continue;
+    const s=toScreen(a.gx,a.gy);
+    const r=12*baseScale*camZoom*soldierScale;
+    if(Math.hypot(mx-s.x,my-s.y)<r){
+      selectedAgent=a;
+      const tier=getTier(a);
+      detailEl.style.display='block';
+      detailEl.style.left=Math.min(e.clientX+10,W-200)+'px';
+      detailEl.style.top=Math.min(e.clientY+10,H-180)+'px';
+      detailEl.innerHTML=`
+        <div class="ad-name" style="color:${a.color}">${a.factionName} #${a.id} [T${tier}]</div>
+        <div class="ad-row"><span>ELO</span><span>${Math.round(a.elo)}</span></div>
+        <div class="ad-row"><span>HP</span><span>${Math.round(a.hp)}%</span></div>
+        <div class="ad-row"><span>GEN</span><span>${a.gen}</span></div>
+        <div class="ad-row"><span>KILLS</span><span>${a.kills}</span></div>
+        <div class="ad-row"><span>${lang==='zh'?'可行性':'Feasibility'}</span><span>${a.fitness.feasibility.toFixed(1)}</span></div>
+        <div class="ad-row"><span>${lang==='zh'?'创新性':'Innovation'}</span><span>${a.fitness.innovation.toFixed(1)}</span></div>
+        <div class="ad-row"><span>${lang==='zh'?'具体性':'Specificity'}</span><span>${a.fitness.specificity.toFixed(1)}</span></div>
+        <div class="ad-row"><span>${lang==='zh'?'成本':'Cost Eff.'}</span><span>${a.fitness.cost.toFixed(1)}</span></div>
+        <div class="ad-row"><span>${lang==='zh'?'突变':'Mutated'}</span><span>${a.mutated?'✓':'—'}</span></div>
+        <div class="ad-row"><span>${lang==='zh'?'父代':'Parents'}</span><span>${a.parents||'—'}</span></div>
+      `;
+      return;
+    }
+  }
+  detailEl.style.display='none';
+});
+
+/* ---------- SECTION: WAR PHASES ---------- */
+function moveAgent(a,tx,ty,speed){
+  const dx=tx-a.gx,dy=ty-a.gy,d=Math.hypot(dx,dy);
+  if(d>.2){
+    a.gx+=dx/d*Math.min(speed,d);
+    a.gy+=dy/d*Math.min(speed,d);
+    a.facing=dx>0?1:-1;
+  }
+}
+function idleWander(){
+  const alive=aliveAgents();
+  for(const a of alive){
+    if(Math.random()<.02){
+      a.targetGx=a.gx+(Math.random()-0.5)*2;
+      a.targetGy=a.gy+(Math.random()-0.5)*2;
+      a.targetGx=Math.max(1,Math.min(COLS-1,a.targetGx));
+      a.targetGy=Math.max(1,Math.min(ROWS-1,a.targetGy));
+    }
+    moveAgent(a,a.targetGx||a.gx,a.targetGy||a.gy,.05);
+    // Occasional idle actions — training sparks, scouting particles
+    if(Math.random()<0.003){
+      const s=toScreen(a.gx,a.gy);
+      const tier=getTier(a);
+      if(tier>=3&&Math.random()<0.5){
+        // High-tier agents practice skills
+        addEffect('slash',{x:s.x+(a.facing*20),y:s.y,color:a.color+'88',facing:a.facing,life:15});
+      } else {
+        // Training particles
+        addParticle(s.x,s.y-10,a.color,1,1,8);
+      }
+    }
+    // Nearby allies spar occasionally
+    if(Math.random()<0.001&&alive.length>2){
+      let nearest=null,nearDist=Infinity;
+      for(const b of alive){
+        if(b===a||b.faction!==a.faction) continue;
+        const d=Math.hypot(a.gx-b.gx,a.gy-b.gy);
+        if(d<nearDist&&d<4){nearDist=d;nearest=b;}
+      }
+      if(nearest){
+        const sa=toScreen(a.gx,a.gy),sb=toScreen(nearest.gx,nearest.gy);
+        addParticle((sa.x+sb.x)/2,(sa.y+sb.y)/2,a.color,2,1,10);
+        a.facing=nearest.gx>a.gx?1:-1;
+        nearest.facing=a.gx>nearest.gx?1:-1;
+      }
+    }
+  }
+}
+
+async function phaseSeed(){
+  currentPhase=0;await announce();
+  // parachute drop
+  const alive=aliveAgents();
+  const factionGroups={};
+  alive.forEach(a=>{if(!factionGroups[a.faction])factionGroups[a.faction]=[];factionGroups[a.faction].push(a);});
+  for(const[fi,group] of Object.entries(factionGroups)){
+    for(const a of group){a.chute=true;a.chuteY=-150-Math.random()*250;}
+    await sleep(300);
+  }
+  // animate drop
+  for(let frame=0;frame<80;frame++){
+    for(const a of alive){
+      if(a.chute&&a.chuteY<0){
+        a.chuteY+=4+Math.random()*2;
+        if(a.chuteY>=0){
+          a.chute=false;a.chuteY=0;
+          const s=toScreen(a.gx,a.gy);
+          addParticle(s.x,s.y,'#aa8866',6,3,25);
+          addFloatText(s.x,s.y-20,t('landed'),a.color,8);
+        }
+      }
+    }
+    await sleep(30);
+  }
+  // ensure all landed
+  for(const a of alive){a.chute=false;a.chuteY=0;}
+  await sleep(500);
+}
+
+async function phaseEval(){
+  currentPhase=1;await announce();
+  if(aliveAgents().length===0){addBattleLog('ERROR: No agents alive');return;}
+  const alive=aliveAgents();
+  // scan each agent with beam
+  for(let i=0;i<alive.length;i++){
+    const a=alive[i];
+    scanTarget=a;
+    const s=toScreen(a.gx,a.gy);
+    // evaluate
+    const totalFit=(a.fitness.feasibility+a.fitness.innovation+a.fitness.specificity+a.fitness.cost)/4;
+    a.elo=950+totalFit*1.5+Math.random()*20;
+    // scan effect
+    addFloatText(s.x,s.y-30,`${totalFit.toFixed(0)}`,a.color,10);
+    addParticle(s.x,s.y-10,a.color,3,2,20);
+    if(i%5===0){
+      camPanTo(a.gx,a.gy,1.5);
+      await sleep(200);
+    }
+    await sleep(50);
+  }
+  updateRanks();
+  scanTarget=null;
+  camReset();
+  await sleep(500);
+}
+
+async function phaseElo(){
+  currentPhase=2;await announce();
+  if(aliveAgents().length<2){addBattleLog('Not enough agents for tournament');return;}
+  const alive=aliveAgents();
+  const rounds=Math.min(25,Math.max(10,alive.length));
+  for(let round=0;round<rounds;round++){
+    // proximity-based: each agent attacks nearest enemy
+    const combatPairs=[];
+    const used=new Set();
+    const shuffled=[...alive.filter(a=>a.alive)].sort(()=>Math.random()-.5);
+    for(const a of shuffled){
+      if(used.has(a.id)) continue;
+      let nearest=null,nearDist=Infinity;
+      for(const b of shuffled){
+        if(b.id===a.id||used.has(b.id)) continue;
+        const d=gridDist(a,b);
+        if(d<nearDist){nearDist=d;nearest=b;}
+      }
+      if(nearest){
+        used.add(a.id);used.add(nearest.id);
+        combatPairs.push([a,nearest]);
+      }
+    }
+    // move toward each other and fight
+    for(const[a,b] of combatPairs){
+      // move closer
+      for(let step=0;step<5;step++){
+        moveAgent(a,b.gx,b.gy,.4);
+        moveAgent(b,a.gx,a.gy,.4);
+        await sleep(20);
+      }
+      // resolve combat
+      const aStr=a.elo+Math.random()*100;
+      const bStr=b.elo+Math.random()*100;
+      const winner=aStr>bStr?a:b;
+      const loser=aStr>bStr?b:a;
+      winner.elo+=30;loser.elo=Math.max(800,loser.elo-30);
+      loser.hp-=5+Math.random()*5;
+      // visual: projectile
+      const ws=toScreen(winner.gx,winner.gy);
+      const ls=toScreen(loser.gx,loser.gy);
+      const tier=getTier(winner);
+      if(tier>=4){
+        addParticle(ls.x,ls.y,'#ff6600',8,4,30);screenShake(3);
+      } else {
+        addParticle(ls.x,ls.y,winner.color,4,2,20);
+      }
+      drawProjectile(ws,ls,winner.color);
+      addFloatText(ws.x,ws.y-20,'+30',winner.color,8);
+      addFloatText(ls.x,ls.y-20,'-30','#ff3333',8);
+    }
+    // zoom into a random pair occasionally
+    if(round%4===0&&combatPairs.length>0){
+      const pair=combatPairs[Math.floor(Math.random()*combatPairs.length)];
+      camPanTo((pair[0].gx+pair[1].gx)/2,(pair[0].gy+pair[1].gy)/2,1.8);
+    }
+    updateRanks();updateSidebar();
+    await sleep(150);
+  }
+  camReset();
+  await sleep(500);
+}
+
+async function phaseSelect(){
+  currentPhase=3;await announce();
+  const alive=aliveAgents().sort((a,b)=>b.elo-a.elo); // high elo first
+  // Core: survival_rate=0.2 → keep top 20%, kill bottom 80%
+  const surviveCount=Math.max(2,Math.ceil(alive.length*0.2));
+  // Core: elite_rate=0.05 → top 5% are immune (guaranteed survival)
+  const eliteCount=Math.max(1,Math.ceil(alive.length*0.05));
+  const elites=new Set(alive.slice(0,eliteCount).map(a=>a.id));
+  // Mark elites with a shield effect
+  for(const a of alive.slice(0,eliteCount)){
+    const s=toScreen(a.gx,a.gy);
+    addParticle(s.x,s.y,'#ffd700',6,2,30);
+    addFloatText(s.x,s.y-25,'ELITE','#ffd700',10);
+  }
+  await sleep(300);
+  // Kill everyone below surviveCount (bottom 80%)
+  const toKill=alive.slice(surviveCount);
+  screenFlash('#ff0000',.2);
+  addBattleLog(`Selection: keeping top ${surviveCount}/${alive.length} (${eliteCount} elites immune)`);
+  for(let i=0;i<toKill.length;i++){
+    const a=toKill[i];
+    if(elites.has(a.id)) continue; // should not happen, but safety
+    a.alive=false;a.hp=0;
+    const s=toScreen(a.gx,a.gy);
+    addParticle(s.x,s.y,'#888',10,3,40);
+    addFloatText(s.x,s.y-20,t('eliminated'),'#ff3333',9);
+    addKillFeed(`${a.factionName}#${a.id} ${t('eliminated')}`,a.color);
+    totalKills++;
+    FACTIONS[a.faction].soldiers--;
+    screenShake(2);
+    if(i%3===0) await sleep(60);
+  }
+  updateRanks();updateSidebar();
+  await sleep(500);
+}
+
+async function phaseCross(){
+  currentPhase=4;await announce();
+  const alive=aliveAgents().sort((a,b)=>b.elo-a.elo);
+  // Breed children until population is restored to TOTAL (like core engine)
+  const needed=Math.max(0,TOTAL-alive.length);
+  for(let i=0;i<needed;i++){
+    // pick two random parents weighted toward higher elo
+    const p1=alive[Math.floor(Math.random()*Math.min(alive.length,Math.ceil(alive.length*.6)))];
+    const p2=alive[Math.floor(Math.random()*alive.length)];
+    if(!p1||!p2||p1.id===p2.id) continue;
+    const child=makeAgent(agents.length,Math.random()>.5?p1.faction:p2.faction);
+    child.gx=(p1.gx+p2.gx)/2+(Math.random()-0.5)*4;
+    child.gy=(p1.gy+p2.gy)/2+(Math.random()-0.5)*4;
+    child.gx=Math.max(1,Math.min(COLS-1,child.gx));
+    child.gy=Math.max(1,Math.min(ROWS-1,child.gy));
+    child.elo=(p1.elo+p2.elo)/2+Math.random()*20-10;
+    child.hp=100;
+    child.gen=currentGen+1;child.chute=false;child.chuteY=0;
+    child.fitness={
+      feasibility:(p1.fitness.feasibility+p2.fitness.feasibility)/2+Math.random()*5,
+      innovation:Math.max(p1.fitness.innovation,p2.fitness.innovation)+Math.random()*3,
+      specificity:(p1.fitness.specificity+p2.fitness.specificity)/2+Math.random()*5,
+      cost:(p1.fitness.cost+p2.fitness.cost)/2+Math.random()*5
+    };
+    child.parents=`${p1.factionName}#${p1.id} × ${p2.factionName}#${p2.id}`;
+    agents.push(child);
+    FACTIONS[child.faction].soldiers++;
+    const s=toScreen(child.gx,child.gy);
+    addParticle(s.x,s.y,'#ffd700',5,2,25);
+    addFloatText(s.x,s.y-20,t('fused'),'#ffd700',10);
+    addKillFeed(`${child.factionName}#${child.id} ${t('fused')}`,child.color);
+    if(i%3===0) screenFlash('#ffd700',.05);
+    if(i%4===0) await sleep(80);
+  }
+  addBattleLog(`Crossover: ${needed} children born, population restored to ${aliveAgents().length}`);
+  updateRanks();updateSidebar();
+  await sleep(500);
+}
+
+async function phaseMutate(){
+  currentPhase=5;await announce();
+  // Core: mutations only apply to children (current gen+1), not elite survivors
+  const children=aliveAgents().filter(a=>a.gen>=currentGen+1);
+  const elites=aliveAgents().filter(a=>a.gen<currentGen+1);
+  screenFlash('#aa00ff',.15);
+  let mutCount=0;
+  for(const a of children){
+    if(Math.random()<.3){
+      a.mutated=true;
+      const boost=(Math.random()-.3)*40;
+      a.elo+=boost;
+      a.fitness.innovation+=Math.random()*15;
+      const s=toScreen(a.gx,a.gy);
+      addParticle(s.x,s.y,'#aa00ff',10,4,30);
+      addFloatText(s.x,s.y-25,t('mutated'),'#aa00ff',10);
+      screenShake(2);
+      // check tier upgrade
+      const newTier=getTier(a);
+      if(newTier>1){
+        addFloatText(s.x,s.y-40,`${t('upgraded')} T${newTier}`,'#ffd700',9);
+      }
+      addKillFeed(`${a.factionName}#${a.id} ${t('mutated')} (${boost>0?'+':''}${boost.toFixed(0)} ELO)`,a.color);
+      mutCount++;
+      await sleep(150);
+    }
+  }
+  addBattleLog(`Mutation: ${mutCount}/${children.length} children mutated, ${elites.length} elites preserved`);
+  updateRanks();updateSidebar();
+  await sleep(500);
+}
+
+// Core: homogeneity_threshold=0.6 — cull children too similar to survivors
+async function phaseHomogeneityCull(){
+  currentPhase=6;await announce();
+  const alive=aliveAgents();
+  const survivors=alive.filter(a=>a.gen<currentGen+1);
+  const children=alive.filter(a=>a.gen>=currentGen+1);
+  let culled=0;
+  for(const child of children){
+    // similarity = average of normalized stat closeness to nearest survivor
+    let maxSim=0;
+    for(const s of survivors){
+      const eloDiff=Math.abs(child.elo-s.elo)/200;
+      const innDiff=Math.abs(child.fitness.innovation-s.fitness.innovation)/50;
+      const feaDiff=Math.abs(child.fitness.feasibility-s.fitness.feasibility)/50;
+      const sim=1-Math.min(1,(eloDiff+innDiff+feaDiff)/3);
+      if(sim>maxSim) maxSim=sim;
+    }
+    if(maxSim>0.6){
+      child.alive=false;child.hp=0;
+      const sc=toScreen(child.gx,child.gy);
+      addParticle(sc.x,sc.y,'#ff8800',6,3,25);
+      addFloatText(sc.x,sc.y-20,'CLONE CULLED','#ff8800',9);
+      addKillFeed(`${child.factionName}#${child.id} culled (${(maxSim*100).toFixed(0)}% similar)`,child.color);
+      totalKills++;
+      FACTIONS[child.faction].soldiers--;
+      culled++;
+    }
+  }
+  if(culled>0){
+    screenFlash('#ff8800',.15);screenShake(3);
+    addBattleLog(`Homogeneity cull: ${culled} clones removed (>${60}% similarity)`);
+  }
+  updateRanks();updateSidebar();
+  await sleep(300);
+}
+
+// Core: fresh_blood_interval=2 — inject new random agents every 2 generations
+async function freshBloodInjection(gen){
+  if((gen+1)%2!==0) return; // only every 2 generations
+  currentPhase=7;await announce();
+  const alive=aliveAgents();
+  const deficit=TOTAL-alive.length;
+  if(deficit<=0) return;
+  const injectCount=Math.min(deficit,Math.ceil(TOTAL*0.1)); // inject up to 10% of total
+  screenFlash('#00ffcc',.15);
+  addBattleLog(`Fresh Blood: injecting ${injectCount} new agents (gen ${gen+1})`);
+  for(let i=0;i<injectCount;i++){
+    const fIdx=Math.floor(Math.random()*FACTIONS.length);
+    const a=makeAgent(agents.length,fIdx);
+    a.gx=Math.random()*COLS;
+    a.gy=Math.random()*ROWS;
+    a.gen=currentGen+1;
+    a.hp=100;a.elo=1000+Math.random()*100-50;
+    a.chute=true;a.chuteY=-200-Math.random()*200;
+    agents.push(a);
+    FACTIONS[fIdx].soldiers++;
+    const s=toScreen(a.gx,a.gy);
+    addParticle(s.x,s.y,'#00ffcc',8,3,30);
+    addFloatText(s.x,s.y-20,'FRESH BLOOD','#00ffcc',10);
+    addKillFeed(`${a.factionName}#${a.id} deployed (fresh blood)`,a.color);
+    if(i%3===0) await sleep(60);
+  }
+  updateRanks();updateSidebar();
+  await sleep(400);
+}
+
+async function phaseRedTeam(){
+  currentPhase=8;await announce();
+  const alive=aliveAgents().sort((a,b)=>b.elo-a.elo);
+  const targets=alive.slice(0,5);
+  // spawn red monsters
+  redMonsters=[];
+  for(let i=0;i<8;i++){
+    const edge=Math.random()*4|0;
+    let gx,gy;
+    if(edge===0){gx=0;gy=Math.random()*ROWS;}
+    else if(edge===1){gx=COLS;gy=Math.random()*ROWS;}
+    else if(edge===2){gx=Math.random()*COLS;gy=0;}
+    else{gx=Math.random()*COLS;gy=ROWS;}
+    redMonsters.push({gx,gy,target:targets[i%targets.length],alive:true});
+  }
+  screenFlash('#ff0000',.2);
+  // monsters approach and attack
+  for(let frame=0;frame<60;frame++){
+    for(const m of redMonsters){
+      if(!m.alive) continue;
+      moveAgent(m,m.target.gx,m.target.gy,.5);
+      if(gridDist(m,m.target)<1.5){
+        m.target.elo-=20;m.target.hp-=10;
+        const s=toScreen(m.target.gx,m.target.gy);
+        addParticle(s.x,s.y,'#ff0000',8,4,25);
+        addFloatText(s.x,s.y-20,'-20 ELO','#ff3333',9);
+        screenShake(4);
+        m.alive=false;
+        addBattleLog(`Red Team attacked ${m.target.factionName}#${m.target.id}`);
+      }
+    }
+    await sleep(50);
+  }
+  redMonsters=[];
+  updateRanks();updateSidebar();
+  await sleep(500);
+}
+
+async function phaseDebate(){
+  currentPhase=9;await announce();
+  const alive=aliveAgents().sort((a,b)=>b.elo-a.elo);
+  const debaters=alive.slice(0,Math.min(4,alive.length));
+  // position them in a circle at center
+  const mid=COLS/2;
+  for(let i=0;i<debaters.length;i++){
+    const angle=(i/debaters.length)*Math.PI*2;
+    debaters[i].targetGx=mid+Math.cos(angle)*3;
+    debaters[i].targetGy=mid+Math.sin(angle)*3;
+  }
+  camPanTo(mid,mid,2);
+  // move them
+  for(let frame=0;frame<30;frame++){
+    for(const d of debaters) moveAgent(d,d.targetGx,d.targetGy,.3);
+    await sleep(40);
+  }
+  // debate rounds
+  for(let i=0;i<debaters.length-1;i++){
+    const a=debaters[i],b=debaters[i+1];
+    drawVS(a,b);
+    // bubble animation
+    const sa=toScreen(a.gx,a.gy),sb=toScreen(b.gx,b.gy);
+    addFloatText(sa.x,sa.y-40,'...','#ffffff',10);
+    await sleep(400);
+    addFloatText(sb.x,sb.y-40,'...','#ffffff',10);
+    await sleep(400);
+    // resolve
+    const winner=a.elo+Math.random()*50>b.elo+Math.random()*50?a:b;
+    const loser=winner===a?b:a;
+    winner.elo+=25;loser.elo-=25;
+    winner.kills++;
+    const ws=toScreen(winner.gx,winner.gy),ls=toScreen(loser.gx,loser.gy);
+    addFloatText(ws.x,ws.y-30,'✓','#00ff41',14);
+    addFloatText(ls.x,ls.y-30,'✗','#ff3333',14);
+    addKillFeed(`${winner.factionName}#${winner.id} ${t('defeated')} ${loser.factionName}#${loser.id}`,winner.color);
+    await sleep(300);
+  }
+  camReset();
+  updateRanks();updateSidebar();
+  await sleep(500);
+}
+
+async function phasePressure(){
+  currentPhase=10;await announce();
+  // shrink storm zone
+  stormZone.targetRadius=6;
+  screenFlash('#ff6600',.2);
+  // meteors
+  for(let wave=0;wave<3;wave++){
+    for(let i=0;i<5;i++){
+      const target=aliveAgents()[Math.floor(Math.random()*aliveAgents().length)];
+      if(!target) continue;
+      const ts=toScreen(target.gx,target.gy);
+      meteors.push({sx:ts.x+Math.random()*40-20,sy:ts.y-200,tx:ts.x,ty:ts.y,progress:0,target});
+    }
+    // animate meteors falling
+    for(let frame=0;frame<30;frame++){
+      for(const m of meteors){
+        m.progress=Math.min(1,m.progress+.04);
+        m.sx+=(m.tx-m.sx)*.08;m.sy+=(m.ty-m.sy)*.08;
+        if(m.progress>=1&&m.target.alive){
+          m.target.hp-=15;m.target.elo-=15;
+          addParticle(m.tx,m.ty,'#ff6600',12,5,35);
+          screenShake(5);
+        }
+      }
+      await sleep(30);
+    }
+    meteors=[];
+    await sleep(200);
+  }
+  // storm zone damage
+  stormZone.radius+=(stormZone.targetRadius-stormZone.radius)*.3;
+  const alive=aliveAgents();
+  for(const a of alive){
+    const d=Math.hypot(a.gx-stormZone.cx,a.gy-stormZone.cy);
+    if(d>stormZone.radius){
+      a.hp-=20;a.elo-=10;
+      if(a.hp<=0){
+        a.alive=false;totalKills++;
+        FACTIONS[a.faction].soldiers--;
+        const s=toScreen(a.gx,a.gy);
+        addParticle(s.x,s.y,'#ff3333',8,3,30);
+        addKillFeed(`${a.factionName}#${a.id} ${t('eliminated')} (storm)`,'#ff3333');
+      } else {
+        // flee toward center
+        moveAgent(a,stormZone.cx,stormZone.cy,1);
+      }
+    }
+  }
+  updateRanks();updateSidebar();
+  await sleep(500);
+}
+
+async function phaseRefine(){
+  currentPhase=11;await announce();
+  forgeActive=true;
+  const champion=aliveAgents().sort((a,b)=>b.elo-a.elo)[0];
+  if(!champion){forgeActive=false;return;}
+  // move champion to center
+  camPanTo(forgePos.gx,forgePos.gy,2);
+  for(let frame=0;frame<40;frame++){
+    moveAgent(champion,forgePos.gx,forgePos.gy,.3);
+    await sleep(40);
+  }
+  // forge animation
+  for(let frame=0;frame<60;frame++){
+    const s=toScreen(champion.gx,champion.gy);
+    addParticle(s.x+(Math.random()-.5)*30,s.y-Math.random()*20,'#ffd700',1,2,25);
+    if(frame%10===0) screenFlash('#ffd700',.1);
+    if(frame===30){
+      champion.elo+=50;
+      champion.fitness.feasibility=Math.min(100,champion.fitness.feasibility+10);
+      champion.fitness.innovation=Math.min(100,champion.fitness.innovation+10);
+      addFloatText(s.x,s.y-40,'+50 ELO','#ffd700',12);
+    }
+    await sleep(40);
+  }
+  forgeActive=false;
+  camReset();
+  updateRanks();updateSidebar();
+  await sleep(500);
+}
+
+async function phaseBaseline(){
+  currentPhase=12;await announce();
+  const champion=aliveAgents().sort((a,b)=>b.elo-a.elo)[0];
+  if(!champion) return;
+  const mid=COLS/2;
+  // position champion left, boss right
+  champion.targetGx=mid-4;champion.targetGy=mid;
+  const bossPos={gx:mid+4,gy:mid};
+  camPanTo(mid,mid,2);
+  for(let frame=0;frame<30;frame++){
+    moveAgent(champion,champion.targetGx,champion.targetGy,.4);
+    await sleep(40);
+  }
+  showCinematic();
+  // battle animation — enhanced multi-step boss fight
+  let champHp=100,bossHp=100;
+  const tier=getTier(champion);
+  const bossSkills=[
+    {name:'CRUSH',color:'#ff4444',type:'melee'},
+    {name:'DARK BEAM',color:'#880088',type:'beam'},
+    {name:'STOMP',color:'#ff6600',type:'aoe'}
+  ];
+  for(let round=0;round<20;round++){
+    const cs=toScreen(champion.gx,champion.gy);
+    const bs=toScreen(bossPos.gx,bossPos.gy);
+    // champion attacks with tier-appropriate skill
+    const skill=getRandomSkill(tier);
+    addFloatText(cs.x,cs.y-40,skill.name,skill.color,10);
+    if(skill.type==='beam'){
+      addEffect('beam',{fx:cs.x,fy:cs.y-10,tx:bs.x,ty:bs.y-10,color:skill.color,width:3,life:25});
+    } else if(skill.type==='melee'){
+      addEffect('slash',{x:bs.x,y:bs.y,color:skill.color,facing:champion.facing,life:20});
+    } else {
+      addEffect('aoe',{x:bs.x,y:bs.y-5,color:skill.color,life:25});
+    }
+    const champDmg=8+Math.random()*7;
+    bossHp-=champDmg;
+    addParticle(bs.x,bs.y,champion.color,6,3,25);
+    addFloatText(bs.x,bs.y-30,`-${champDmg.toFixed(0)}`,'#ff3333',10);
+    screenShake(3);
+    await sleep(250);
+    // boss attacks with boss-specific skills
+    const bSkill=bossSkills[round%bossSkills.length];
+    addFloatText(bs.x,bs.y-40,bSkill.name,bSkill.color,10);
+    if(bSkill.type==='beam'){
+      addEffect('beam',{fx:bs.x,fy:bs.y-10,tx:cs.x,ty:cs.y-10,color:bSkill.color,width:4,life:25});
+    } else if(bSkill.type==='melee'){
+      addEffect('slash',{x:cs.x,y:cs.y,color:bSkill.color,facing:-champion.facing,life:20});
+    } else {
+      addEffect('aoe',{x:cs.x,y:cs.y-5,color:bSkill.color,life:25});
+    }
+    const bossDmg=5+Math.random()*5;
+    champHp-=bossDmg;
+    addParticle(cs.x,cs.y,'#888',4,2,20);
+    addFloatText(cs.x,cs.y-30,`-${bossDmg.toFixed(0)}`,'#ff3333',9);
+    // Champion occasionally shields
+    if(Math.random()<0.3) addEffect('shield',{x:cs.x,y:cs.y,color:champion.color,life:18});
+    await sleep(250);
+    // Every 3rd round, a dramatic clash
+    if(round%3===2){
+      addEffect('aoe',{x:(cs.x+bs.x)/2,y:(cs.y+bs.y)/2,color:'#ffd700',life:30});
+      addFloatText((cs.x+bs.x)/2,(cs.y+bs.y)/2-25,'CLASH!','#ffffff',12);
+      screenShake(5);screenFlash('#ffffff',.1);
+      await sleep(150);
+    }
+    if(bossHp<=0){
+      // boss defeated
+      addParticle(bs.x,bs.y,'#ff6600',20,5,40);
+      screenFlash('#ffd700',.3);screenShake(8);
+      addFloatText(bs.x,bs.y-40,'DEFEATED','#ffd700',14);
+      break;
+    }
+  }
+  if(bossHp>0){
+    // champion still wins on points
+    addFloatText(toScreen(champion.gx,champion.gy).x,toScreen(champion.gx,champion.gy).y-40,'VICTORY','#ffd700',14);
+    screenFlash('#ffd700',.2);
+  }
+  hideCinematic();
+  await sleep(1000);
+  // final announcement
+  const el=document.getElementById('announce');
+  document.getElementById('announce-title').textContent=t('evolutionComplete');
+  document.getElementById('announce-sub').textContent=`${champion.factionName} #${champion.id} — ELO ${Math.round(champion.elo)}`;
+  el.style.opacity='1';
+  screenFlash('#ffd700',.2);
+  await sleep(3000);
+  el.style.opacity='0';
+  camReset();
+}
+
+async function war(){
+  warStartTime=Date.now();
+  initPopulation();updateSidebar();
+  await sleep(500);
+
+  // === PRE-EVOLUTION: Population Initialization ===
+  await phaseSeed();
+
+  // === MAIN EVOLUTION LOOP (per generation) ===
+  for(let gen=0;gen<GENS;gen++){
+    currentGen=gen+1;
+    document.getElementById('gen-counter').textContent=`GEN ${currentGen}`;
+    if(gen>0){
+      // Heal survivors between generations
+      for(const a of aliveAgents()) a.hp=Math.min(100,a.hp+30);
+      const el=document.getElementById('announce');
+      document.getElementById('announce-title').textContent=`GENERATION ${currentGen}`;
+      document.getElementById('announce-sub').textContent='';
+      el.style.opacity='1';screenFlash('#ffd700',.15);
+      await sleep(800);el.style.opacity='0';
+    }
+    // Phase 1: Absolute Evaluation (every generation)
+    await phaseEval();
+    // Phase 2: Elo Tournament (every generation)
+    await phaseElo();
+    // Phase 3: Selection — eliminate weakest
+    await phaseSelect();
+    // Phase 4: Crossover — breed survivors
+    await phaseCross();
+    // Phase 5: Mutation — random evolution on children
+    await phaseMutate();
+    // Core: homogeneity_threshold=0.6 — cull clones after mutation
+    await phaseHomogeneityCull();
+    // Core: fresh_blood_interval=2 — inject new agents every 2 generations
+    await freshBloodInjection(gen);
+  }
+
+  // === POST-EVOLUTION GAUNTLET (after all generations) ===
+  // Phase 6: Red Team adversarial attack on top survivors
+  await phaseRedTeam();
+  // Phase 7: Debate tournament among top candidates
+  await phaseDebate();
+  // Phase 8: Pressure test — extreme scenarios
+  await phasePressure();
+  // Phase 9: Refinement — forge the champion
+  await phaseRefine();
+  // Phase 10: Baseline comparison — evolved vs raw AI
+  await phaseBaseline();
+
+  showResults();
+}
+
+/* ---------- SECTION: RENDER LOOP ---------- */
+function render(){
+  ctx.clearRect(0,0,W,H);
+  // background
+  ctx.fillStyle='#1f3e15';ctx.fillRect(0,0,W,H);
+  // shake offset
+  const sx=shakeAmount?(Math.random()-.5)*shakeAmount*2:0;
+  const sy=shakeAmount?(Math.random()-.5)*shakeAmount*2:0;
+  ctx.save();
+  ctx.translate(sx,sy);
+  updateCamera();
+  // terrain
+  drawTerrain();
+  // storm zone
+  if(stormZone.radius<COLS/2+1) drawStormZone();
+  // forge
+  drawForge();
+  // agents sorted by gy for depth
+  const sorted=[...agents].sort((a,b)=>a.gy-b.gy);
+  for(const a of sorted){
+    const s=toScreen(a.gx,a.gy);
+    if(s.x<-50||s.x>W+50||s.y<-50||s.y>H+50) continue;
+    const sc=baseScale*camZoom;
+    const tier=getTier(a);
+    if(a.chute&&a.chuteY<0){
+      drawSoldier(s.x,s.y+a.chuteY*sc,a.color,tier,sc,a.alive,a.facing,a===selectedAgent);
+      drawParachute(s.x,s.y+a.chuteY*sc,a.color,sc);
+    } else {
+      // Energy aura for high-tier agents
+      if(a.alive) drawAura(s.x,s.y,a.color,tier,sc*soldierScale);
+      drawSoldier(s.x,s.y,a.color,tier,sc,a.alive,a.facing,a===selectedAgent);
+    }
+    // HP bar above agent
+    if(a.alive&&a.hp<100){
+      const barW=16*sc*soldierScale;
+      const barH=2*sc*soldierScale;
+      const barY=s.y-(a.chute&&a.chuteY<0?-a.chuteY*sc:0)-20*sc*soldierScale;
+      const hpPct=Math.max(0,a.hp/100);
+      // background
+      ctx.fillStyle='rgba(0,0,0,.6)';
+      ctx.fillRect(s.x-barW/2-1,barY-1,barW+2,barH+2);
+      // fill
+      ctx.fillStyle=hpPct>.6?'#00ff41':hpPct>.3?'#ffaa00':'#ff3333';
+      ctx.fillRect(s.x-barW/2,barY,barW*hpPct,barH);
+    }
+  }
+  // red monsters
+  for(const m of redMonsters){
+    if(m.alive) drawRedMonster(m);
+  }
+  // meteors
+  for(const m of meteors){
+    if(m.progress<1) drawMeteor(m);
+  }
+  // scan beam
+  if(scanTarget){
+    drawScanBeam();
+  }
+  // boss (draw during baseline phase)
+  if(currentPhase===12){
+    const mid=COLS/2;
+    const bs=toScreen(mid+4,mid);
+    drawBoss(bs.x,bs.y,baseScale*camZoom);
+  }
+  // rank badges
+  drawRankBadges();
+  // particles & float text
+  drawParticles();
+  updateAndDrawEffects();
+  drawFloatTexts();
+  ctx.restore();
+  // screen effects (no shake transform)
+  applyScreenFx();
+  updateScreenFx();
+  updateParticles();
+  idleWander();
+  // storm zone shrink
+  if(stormZone.radius>stormZone.targetRadius){
+    stormZone.radius+=(stormZone.targetRadius-stormZone.radius)*.002;
+  }
+  requestAnimationFrame(render);
+}
+render();
+
+/* ---------- SECTION: RESULTS SCREEN ---------- */
+function showResults(){
+  const el=document.getElementById('results');
+  const content=document.getElementById('res-content');
+  const champion=aliveAgents().sort((a,b)=>b.elo-a.elo)[0];
+  const alive=aliveAgents();
+  const duration=((Date.now()-warStartTime)/1000).toFixed(0);
+  const mins=(duration/60)|0;
+  const secs=duration%60;
+  // faction breakdown
+  let factionHtml='';
+  for(const f of FACTIONS){
+    const fi=FACTIONS.indexOf(f);
+    const fAlive=alive.filter(a=>a.faction===fi);
+    const fAll=agents.filter(a=>a.faction===fi);
+    const fKills=fAll.reduce((s,a)=>s+a.kills,0);
+    factionHtml+=`<div class="res-faction-row">
+      <div class="faction-dot" style="background:${f.color}"></div>
+      <span style="color:${f.color};flex:1">${f.name}</span>
+      <span>${fAlive.length}/${fAll.length}</span>
+      <span style="margin-left:12px">${fKills} kills</span>
+    </div>`;
+  }
+  // top 5
+  let topHtml='';
+  const top5=alive.sort((a,b)=>b.elo-a.elo).slice(0,5);
+  const medals=['🥇','🥈','🥉','④','⑤'];
+  top5.forEach((a,i)=>{
+    topHtml+=`<div class="res-rank-row">
+      <div class="res-rank-num">${medals[i]}</div>
+      <div class="faction-dot" style="background:${a.color}"></div>
+      <span style="color:${a.color};flex:1">${a.factionName}#${a.id}</span>
+      <span>T${getTier(a)}</span>
+      <span style="margin-left:8px">ELO ${Math.round(a.elo)}</span>
+    </div>`;
+  });
+
+  content.innerHTML=`
+    <div class="res-crown">👑</div>
+    <div class="res-champ">${champion?champion.factionName+' #'+champion.id:'—'}</div>
+    <div class="res-champ-sub">ELO ${champion?Math.round(champion.elo):0} | T${champion?getTier(champion):0} | GEN ${champion?champion.gen:0}</div>
+    <div class="res-grid">
+      <div class="res-card"><div class="res-card-val">${mins}:${String(secs).padStart(2,'0')}</div><div class="res-card-lbl">${t('duration')}</div></div>
+      <div class="res-card"><div class="res-card-val">${totalKills}</div><div class="res-card-lbl">${t('totalKills')}</div></div>
+      <div class="res-card"><div class="res-card-val">${alive.length}</div><div class="res-card-lbl">${t('survivors')}</div></div>
+      <div class="res-card"><div class="res-card-val">${GENS}</div><div class="res-card-lbl">${t('generations')}</div></div>
+      <div class="res-card"><div class="res-card-val">${agents.length*3}</div><div class="res-card-lbl">${t('apiCalls')}</div></div>
+      <div class="res-card"><div class="res-card-val">$${(agents.length*0.012).toFixed(2)}</div><div class="res-card-lbl">${t('cost')}</div></div>
+    </div>
+    <div class="res-section">
+      <div class="res-section-title">${t('factionBreakdown')}</div>
+      ${factionHtml}
+    </div>
+    <div class="res-section">
+      <div class="res-section-title">${t('topFighters')}</div>
+      ${topHtml}
+    </div>
+    <div class="res-section">
+      <div class="res-section-title">${t('evolvedAnswer')}</div>
+      <div id="res-answer">
+        ${champion?`<strong>${champion.factionName} #${champion.id}</strong> (T${getTier(champion)})<br>
+        Feasibility: ${champion.fitness.feasibility.toFixed(1)} | Innovation: ${champion.fitness.innovation.toFixed(1)}<br>
+        Specificity: ${champion.fitness.specificity.toFixed(1)} | Cost Efficiency: ${champion.fitness.cost.toFixed(1)}<br>
+        Mutated: ${champion.mutated?'Yes':'No'} | Parents: ${champion.parents||'Original'}<br><br>
+        <em>${lang==='zh'?'在实际运行中，此处将展示由 EvoHive 进化引擎生成的最优方案。':'In production, this displays the optimal solution generated by the EvoHive evolution engine.'}</em>`:'No champion survived.'}
+      </div>
+    </div>
+    <button id="restart-btn" onclick="document.getElementById('results').style.display='none';restartWar()">${t('restart')}</button>
+  `;
+  el.style.display='block';
+}
+function restartWar(){
+  agents=[];particles=[];floatTexts=[];killfeed=[];battlelog=[];
+  totalKills=0;currentPhase=0;currentGen=1;
+  stormZone.radius=COLS/2+2;stormZone.targetRadius=5;
+  redMonsters=[];meteors=[];scanTarget=null;forgeActive=false;
+  selectedAgent=null;
+  camTargetX=0;camTargetY=0;camTargetZoom=1;camX=0;camY=0;camZoom=1;
+  updateSidebar();
+  document.getElementById('config-modal').style.display='flex';
+  renderConfigProviders();
+}
+
+/* ---------- SECTION: INIT ---------- */
+document.getElementById('lang-btn').addEventListener('click',()=>{
+  lang=lang==='en'?'zh':'en';
+  updateI18N();updateSidebar();
+});
+document.getElementById('pause-btn').addEventListener('click',()=>{
+  simPaused=!simPaused;
+  document.getElementById('pause-btn').textContent=simPaused?'▶':'⏸';
+});
+document.querySelectorAll('.speed-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    simSpeed=parseInt(btn.dataset.speed);
+    document.querySelectorAll('.speed-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+  });
+});
+document.getElementById('reset-cam-btn').addEventListener('click',()=>{
+  camTargetX=0;camTargetY=0;camTargetZoom=1;
+});
+// Keyboard shortcuts
+window.addEventListener('keydown',e=>{
+  if(document.getElementById('config-modal').style.display!=='none'){
+    if(e.key==='Escape'){document.getElementById('config-modal').style.display='none';}
+    return;
+  }
+  if(e.key===' '||e.key==='Spacebar'){
+    e.preventDefault();
+    simPaused=!simPaused;
+    document.getElementById('pause-btn').textContent=simPaused?'▶':'⏸';
+  }
+  if(e.key==='1'){simSpeed=1;document.querySelectorAll('.speed-btn').forEach((b,i)=>b.classList.toggle('active',i===0));}
+  if(e.key==='2'){simSpeed=2;document.querySelectorAll('.speed-btn').forEach((b,i)=>b.classList.toggle('active',i===1));}
+  if(e.key==='3'){simSpeed=4;document.querySelectorAll('.speed-btn').forEach((b,i)=>b.classList.toggle('active',i===2));}
+  if(e.key==='r'||e.key==='R'){camTargetX=0;camTargetY=0;camTargetZoom=1;}
+  if(e.key==='Escape'){
+    const detail=document.getElementById('agent-detail');
+    if(detail.style.display==='block'){detail.style.display='none';selectedAgent=null;}
+  }
+});
+// Mobile sidebar toggle
+document.getElementById('mobile-sb-btn').addEventListener('click',()=>{
+  document.getElementById('sidebar').classList.toggle('mobile-show');
+});
+updateI18N();
+
+/* ---------- SECTION: CONFIG MODAL ---------- */
+function renderConfigProviders(){
+  const el=document.getElementById('cfg-providers');
+  el.innerHTML=ALL_PROVIDERS.map(p=>{
+    const sel=selectedProviders.has(p.id)?'selected':'';
+    return `<div class="cfg-prov ${sel}" data-pid="${p.id}" tabindex="0" role="checkbox" aria-checked="${sel?'true':'false'}">
+      <div class="cfg-prov-head">
+        <div class="cfg-check">${sel?'✓':''}</div>
+        <div class="cfg-prov-dot" style="background:${p.color}"></div>
+        <div class="cfg-prov-name">${p.name}</div>
+      </div>
+      <div class="cfg-prov-models">${p.models.join(', ')}</div>
+    </div>`;
+  }).join('');
+  updateConfigSummary();
+}
+// Delegated click handler — no listener accumulation
+document.getElementById('cfg-providers').addEventListener('click',e=>{
+  const card=e.target.closest('.cfg-prov');
+  if(!card) return;
+  const pid=card.dataset.pid;
+  if(selectedProviders.has(pid)) selectedProviders.delete(pid);
+  else selectedProviders.add(pid);
+  renderConfigProviders();
+});
+document.getElementById('cfg-providers').addEventListener('keydown',e=>{
+  if(e.key==='Enter'||e.key===' '){
+    e.preventDefault();
+    const card=e.target.closest('.cfg-prov');
+    if(!card) return;
+    const pid=card.dataset.pid;
+    if(selectedProviders.has(pid)) selectedProviders.delete(pid);
+    else selectedProviders.add(pid);
+    renderConfigProviders();
+  }
+});
+function updateConfigSummary(){
+  const cnt=selectedProviders.size;
+  document.getElementById('cfg-sel-count').textContent=cnt;
+  document.getElementById('cfg-sel-agents').textContent=document.getElementById('cfg-agents').value;
+  document.getElementById('start-war-btn').disabled=cnt<2;
+  const errEl=document.getElementById('cfg-error');
+  if(errEl) errEl.style.display=cnt<2?'block':'none';
+}
+// Slider events
+document.getElementById('cfg-agents').addEventListener('input',e=>{
+  document.getElementById('cfg-agents-val').textContent=e.target.value;
+  updateConfigSummary();
+});
+document.getElementById('cfg-gens').addEventListener('input',e=>{
+  document.getElementById('cfg-gens-val').textContent=e.target.value;
+});
+// Start button
+document.getElementById('start-war-btn').addEventListener('click',()=>{
+  if(selectedProviders.size<2) return;
+  TOTAL=parseInt(document.getElementById('cfg-agents').value);
+  GENS=parseInt(document.getElementById('cfg-gens').value);
+  soldierScale=Math.max(.45,100/TOTAL);
+  // persist config
+  try{localStorage.setItem('evohive-cfg',JSON.stringify({total:TOTAL,gens:GENS,providers:[...selectedProviders]}));}catch(e){}
+  buildFactions();
+  document.getElementById('config-modal').style.display='none';
+  if(wsLiveMode&&wsConn&&wsConn.readyState===WebSocket.OPEN){
+    // BACKEND-DRIVEN MODE: don't run local war(), let backend events drive everything
+    backendDriven=true;
+    warStartTime=Date.now();
+    initPopulation();updateSidebar();
+    phaseSeed(); // just play the airdrop animation, then wait for backend events
+    // Send config to backend
+    wsConn.send(JSON.stringify({
+      type:'start_war',
+      config:{
+        providers:[...selectedProviders],
+        total:TOTAL,
+        gens:GENS,
+      }
+    }));
+    addBattleLog('Sent war config to backend (backend-driven mode)');
+  } else {
+    // STANDALONE MODE: run local simulation
+    backendDriven=false;
+    war();
+  }
+});
+// Restore saved config
+try{
+  const saved=JSON.parse(localStorage.getItem('evohive-cfg'));
+  if(saved){
+    if(saved.total){document.getElementById('cfg-agents').value=saved.total;document.getElementById('cfg-agents-val').textContent=saved.total;}
+    if(saved.gens){document.getElementById('cfg-gens').value=saved.gens;document.getElementById('cfg-gens-val').textContent=saved.gens;}
+    if(saved.providers&&saved.providers.length>=2){selectedProviders=new Set(saved.providers);}
+  }
+}catch(e){}
+renderConfigProviders();
+// Auto-dismiss hint after 8 seconds or first interaction
+let hintEl=document.getElementById('hint-overlay');
+if(hintEl){
+  hintEl.style.opacity='0';
+  function showHint(){if(hintEl)hintEl.style.opacity='1';}
+  function dismissHint(){if(hintEl){hintEl.style.opacity='0';hintEl=null;}}
+  // Show hint when war starts (after config closes)
+  const origWar=war;
+  war=async function(){showHint();setTimeout(dismissHint,8000);cvCam.addEventListener('wheel',dismissHint,{once:true});cvCam.addEventListener('mousedown',dismissHint,{once:true});cvCam.addEventListener('touchstart',dismissHint,{once:true});return origWar();};
+}
+
+/* ============================================================
+   WEBSOCKET BRIDGE — Backend-driven mode
+   When connected, frontend waits for backend events to drive
+   all phase transitions and state changes. No local simulation.
+   ============================================================ */
+let wsConn=null;
+let wsLiveMode=false;
+let wsEventLog=[];
+let backendDriven=false;
+let backendEventQueue=[];
+let processingBackendEvents=false;
+
+function connectWebSocket(){
+  const proto=location.protocol==='https:'?'wss:':'ws:';
+  const wsUrl=`${proto}//${location.host}/ws`;
+  try{
+    wsConn=new WebSocket(wsUrl);
+  }catch(e){
+    console.log('WebSocket not available, running in standalone mode');
+    return;
+  }
+  wsConn.onopen=()=>{
+    console.log('[WS] Connected to EvoHive backend');
+    addBattleLog('Backend connected — Live mode available');
+    wsLiveMode=true;
+    const indicator=document.createElement('div');
+    indicator.id='ws-indicator';
+    indicator.style.cssText='position:absolute;top:8px;left:8px;z-index:11;background:rgba(0,40,0,.9);border:1px solid #00ff41;border-radius:4px;padding:3px 8px;font-size:9px;color:#00ff41;font-family:"Share Tech Mono",monospace;pointer-events:none';
+    indicator.textContent='● LIVE';
+    document.getElementById('canvas-wrap').appendChild(indicator);
+  };
+  wsConn.onmessage=(e)=>{
+    try{
+      const msg=JSON.parse(e.data);
+      wsEventLog.push(msg);
+      if(backendDriven){
+        // Queue events for sequential processing with animations
+        handleBackendMessageQueued(msg);
+      } else {
+        // Standalone overlay mode (legacy)
+        handleBackendMessageDirect(msg);
+      }
+    }catch(err){console.warn('[WS] Parse error',err);}
+  };
+  wsConn.onclose=()=>{
+    console.log('[WS] Disconnected');
+    wsLiveMode=false;
+    const ind=document.getElementById('ws-indicator');
+    if(ind){ind.textContent='○ OFFLINE';ind.style.borderColor='#ff3333';ind.style.color='#ff3333';}
+    setTimeout(()=>{if(!wsLiveMode)connectWebSocket();},3000);
+  };
+  wsConn.onerror=()=>{
+    console.log('[WS] Connection failed — standalone mode');
+    wsLiveMode=false;
+  };
+}
+
+// Map backend event types to frontend phases
+const EVENT_PHASE_MAP={
+  'evaluation_started':1,'evaluation_complete':1,
+  'elo_tournament_started':2,'elo_tournament_complete':2,
+  'selection_complete':3,
+  'crossover_started':4,'crossover_complete':4,
+  'mutation_complete':5,
+  'homogeneity_culled':6,
+  'fresh_blood_injected':7,
+  'red_team_started':8,'red_team_attack':8,'red_team_complete':8,
+  'debate_started':9,'debate_round':9,'debate_complete':9,
+  'pressure_test_started':10,'pressure_test_complete':10,
+  'refinement_started':11,'refinement_complete':11,
+  'run_complete':12,
+};
+
+// ═══ BACKEND-DRIVEN MODE: Event Queue + Sequential Processing ═══
+
+function handleBackendMessageQueued(msg){
+  switch(msg.type){
+    case 'war_started':
+      addBattleLog(`Backend war started: ${msg.config.total} agents, ${msg.config.gens} gens, mode=${msg.config.mode}`);
+      addKillFeed('LIVE: Evolution engine running','#00ff41');
+      break;
+    case 'evolution_event':
+      backendEventQueue.push(msg);
+      if(!processingBackendEvents) processBackendQueue();
+      break;
+    case 'generation_summary':
+      backendEventQueue.push(msg);
+      if(!processingBackendEvents) processBackendQueue();
+      break;
+    case 'war_complete':
+      backendEventQueue.push(msg);
+      if(!processingBackendEvents) processBackendQueue();
+      break;
+    case 'war_error':
+      addBattleLog(`Backend error: ${msg.error}`);
+      addKillFeed(`ERROR: ${msg.error}`,'#ff3333');
+      break;
+    case 'pong':
+      break;
+  }
+}
+
+async function processBackendQueue(){
+  processingBackendEvents=true;
+  while(backendEventQueue.length>0){
+    const msg=backendEventQueue[0];
+    backendEventQueue.shift();
+    try{
+      if(msg.type==='evolution_event') await processEvolutionEvent(msg);
+      else if(msg.type==='generation_summary') await processGenSummary(msg.data);
+      else if(msg.type==='war_complete') await processWarComplete(msg.results);
+    }catch(err){console.warn('[Queue] Error processing event:',err);}
+  }
+  processingBackendEvents=false;
+}
+
+// Check if next queued event is a significant phase change (not just a status_update or progress)
+function hasNextPhaseEvent(){
+  for(let i=0;i<backendEventQueue.length;i++){
+    const m=backendEventQueue[i];
+    if(m.type!=='evolution_event') return true; // war_complete, generation_summary
+    if(m.event_type && m.event_type!=='status_update'
+       && m.event_type!=='evaluation_progress'
+       && m.event_type!=='elo_round_complete') return true;
+  }
+  return false;
+}
+
+// Drain any status_update events from front of queue (process them inline without breaking loops)
+function drainStatusUpdates(){
+  while(backendEventQueue.length>0){
+    const peek=backendEventQueue[0];
+    if(peek.type==='evolution_event' && peek.event_type==='status_update'){
+      backendEventQueue.shift();
+      if(peek.data&&peek.data.message) addBattleLog(`[STATUS] ${peek.data.message}`);
+    } else break;
+  }
+}
+
+// Consume one progress event from queue (evaluation_progress or elo_round_complete)
+// Returns the event data or null if no progress event available
+function consumeProgressEvent(eventType){
+  for(let i=0;i<backendEventQueue.length;i++){
+    const m=backendEventQueue[i];
+    if(m.type==='evolution_event' && m.event_type===eventType){
+      backendEventQueue.splice(i,1);
+      return m.data||{};
+    }
+    // Skip status_updates, stop at other event types
+    if(m.type==='evolution_event' && m.event_type==='status_update') continue;
+    break;
+  }
+  return null;
+}
+
+async function processEvolutionEvent(msg){
+  const evtType=msg.event_type;
+  const data=msg.data||{};
+
+  // Update phase indicator
+  const phaseIdx=EVENT_PHASE_MAP[evtType];
+  if(phaseIdx!==undefined){
+    currentPhase=phaseIdx;
+    updatePhaseTimeline();
+    const phase=PHASES[phaseIdx];
+    if(phase){
+      document.getElementById('phase-name').textContent=lang==='zh'?phase.zh:phase.en;
+      document.getElementById('phase-sub').textContent=lang==='zh'?phase.sub_zh:phase.sub_en;
+    }
+  }
+
+  // Log event
+  const label=evtType.replace(/_/g,' ').toUpperCase();
+  addBattleLog(`[LIVE] ${label}`);
+
+  // ── Phase-specific animations (async, respects simSpeed via sleep()) ──
+
+  if(evtType==='generation_started'){
+    const gen=data.generation||1;
+    currentGen=gen;
+    document.getElementById('gen-counter').textContent=`GEN ${currentGen}`;
+    if(gen>1){
+      for(const a of aliveAgents()) a.hp=Math.min(100,a.hp+30);
+      const el=document.getElementById('announce');
+      document.getElementById('announce-title').textContent=`GENERATION ${currentGen}`;
+      document.getElementById('announce-sub').textContent='';
+      el.style.opacity='1';screenFlash('#ffd700',.15);
+      await sleep(800);el.style.opacity='0';
+    }
+    // Idle patrol loop — agents drift while waiting for backend evaluation
+    const alive=aliveAgents();
+    let tick=0;
+    while(!hasNextPhaseEvent()){drainStatusUpdates();
+      if(alive.length===0) break;
+      // Gentle random movement to show "thinking"
+      const a=alive[tick%alive.length];
+      a.targetGx=a.gx+(Math.random()-0.5)*0.8;
+      a.targetGy=a.gy+(Math.random()-0.5)*0.8;
+      if(tick%8===0){
+        const s=toScreen(a.gx,a.gy);
+        addParticle(s.x,s.y-10,a.color,1,1,10);
+      }
+      tick++;
+      await sleep(300);
+    }
+  }
+  else if(evtType==='evaluation_started'){
+    // Progress-driven scan: each evaluation_progress event triggers one agent scan
+    const alive=aliveAgents();
+    let evalDone=0,evalTotal=alive.length;
+    // Update phase subtitle with progress
+    const subEl=document.getElementById('phase-sub');
+    subEl.textContent=`Evaluating 0/${evalTotal}`;
+    while(!hasNextPhaseEvent()){
+      drainStatusUpdates();
+      if(alive.length===0) break;
+      // Check for evaluation_progress event
+      const prog=consumeProgressEvent('evaluation_progress');
+      if(prog){
+        evalDone=prog.done||evalDone+1;
+        evalTotal=prog.total||evalTotal;
+        subEl.textContent=`Evaluating ${evalDone}/${evalTotal}`;
+        // Animate the specific agent or next in line
+        const agentIdx=Math.min(evalDone-1,alive.length-1);
+        const a=alive[agentIdx];
+        if(a){
+          scanTarget=a;
+          const s=toScreen(a.gx,a.gy);
+          const totalFit=(a.fitness.feasibility+a.fitness.innovation+a.fitness.specificity+a.fitness.cost)/4;
+          // Shield effect during evaluation
+          addEffect('shield',{x:s.x,y:s.y,color:a.color,life:30});
+          addFloatText(s.x,s.y-30,`${totalFit.toFixed(0)}`,a.color,10);
+          // Score grade text
+          const grade=totalFit>80?'S':totalFit>70?'A':totalFit>60?'B':'C';
+          const gradeColor=totalFit>80?'#ffd700':totalFit>70?'#00ff41':totalFit>60?'#44aaff':'#888';
+          addFloatText(s.x+20,s.y-40,grade,gradeColor,12);
+          addParticle(s.x,s.y-10,a.color,4,2,20);
+          camPanTo(a.gx,a.gy,1.5);
+          addKillFeed(`Evaluated ${evalDone}/${evalTotal}: ${a.factionName}#${a.id} [${grade}]`,a.color);
+        }
+        await sleep(150);
+      } else {
+        // No progress event yet — subtle idle pulse on current scan target
+        if(scanTarget){
+          const s=toScreen(scanTarget.gx,scanTarget.gy);
+          addParticle(s.x,s.y-5,scanTarget.color,1,1,8);
+        }
+        await sleep(300);
+      }
+    }
+    scanTarget=null;camReset();
+    subEl.textContent='';
+  }
+  else if(evtType==='evaluation_complete'){
+    screenFlash('#00ffcc',.1);
+    if(data.best_fitness) addKillFeed(`Best fitness: ${Number(data.best_fitness).toFixed(2)}`,'#ffd700');
+    if(data.avg_fitness) addKillFeed(`Avg fitness: ${Number(data.avg_fitness).toFixed(2)}`,'#c8e6c8');
+    updateRanks();updateSidebar();
+    await sleep(300);
+  }
+  else if(evtType==='elo_tournament_started'){
+    // Progress-driven combat: each elo_round_complete triggers a full combat round
+    await announce();
+    const alive=aliveAgents();
+    if(alive.length<2) return;
+    const subEl=document.getElementById('phase-sub');
+    const totalRounds=data.total_rounds||Math.ceil(Math.log2(alive.length))+2;
+    subEl.textContent=`Round 0/${totalRounds}`;
+    let roundNum=0;
+    while(!hasNextPhaseEvent()){
+      drainStatusUpdates();
+      const prog=consumeProgressEvent('elo_round_complete');
+      if(prog){
+        roundNum=prog.round||roundNum+1;
+        const totalR=prog.total_rounds||totalRounds;
+        const nPairs=prog.n_pairs||'?';
+        subEl.textContent=`Round ${roundNum}/${totalR} (${nPairs} pairs)`;
+
+        // Build combat pairs — find nearest cross-faction opponents
+        const combatPairs=[];
+        const used=new Set();
+        const sortedAlive=alive.filter(a=>a.alive).sort((a,b)=>b.elo-a.elo);
+        for(const a of sortedAlive){
+          if(used.has(a.id)) continue;
+          let nearest=null,nearDist=Infinity;
+          for(const b of sortedAlive){
+            if(b===a||used.has(b.id)||b.faction===a.faction) continue;
+            const d=Math.hypot(a.gx-b.gx,a.gy-b.gy);
+            if(d<nearDist){nearDist=d;nearest=b;}
+          }
+          // Also allow same-faction combat if no cross-faction nearby
+          if(!nearest){
+            for(const b of sortedAlive){
+              if(b===a||used.has(b.id)) continue;
+              const d=Math.hypot(a.gx-b.gx,a.gy-b.gy);
+              if(d<nearDist){nearDist=d;nearest=b;}
+            }
+          }
+          if(nearest){
+            combatPairs.push([a,nearest]);
+            used.add(a.id);used.add(nearest.id);
+          }
+        }
+
+        // ── Multi-step combat choreography for up to 4 pairs ──
+        const pairs=combatPairs.slice(0,4);
+        if(pairs.length>0){
+          // Step 1: Approach — agents move toward each other
+          const origPositions=pairs.map(([a,b])=>({
+            ax:a.gx,ay:a.gy,bx:b.gx,by:b.gy
+          }));
+          for(const [a,b] of pairs){
+            a.targetGx=a.gx+(b.gx-a.gx)*0.35;
+            a.targetGy=a.gy+(b.gy-a.gy)*0.35;
+            b.targetGx=b.gx+(a.gx-b.gx)*0.35;
+            b.targetGy=b.gy+(a.gy-b.gy)*0.35;
+            a.facing=b.gx>a.gx?1:-1;
+            b.facing=a.gx>b.gx?1:-1;
+          }
+          // Camera follows the first pair
+          const fp=pairs[0];
+          camPanTo((fp[0].gx+fp[1].gx)/2,(fp[0].gy+fp[1].gy)/2,1.6);
+          await sleep(250);
+
+          // Step 2: First strike — attacker launches skill
+          for(const [a,b] of pairs){
+            const sa=toScreen(a.gx,a.gy),sb=toScreen(b.gx,b.gy);
+            launchAttack(a,b,sa,sb);
+          }
+          await sleep(200);
+
+          // Step 3: Counter-attack — defender retaliates
+          for(const [a,b] of pairs){
+            const sa=toScreen(a.gx,a.gy),sb=toScreen(b.gx,b.gy);
+            launchAttack(b,a,sb,sa);
+            // Shield flicker on attacker (defense)
+            addEffect('shield',{x:sa.x,y:sa.y,color:a.color,life:20});
+          }
+          await sleep(200);
+
+          // Step 4: Resolve — determine winner, apply ELO
+          for(let pi=0;pi<pairs.length;pi++){
+            const [a,b]=pairs[pi];
+            const ea=1/(1+Math.pow(10,(b.elo-a.elo)/400));
+            const winner=Math.random()<ea?a:b;
+            const loser=winner===a?b:a;
+            const K=16+Math.floor(Math.random()*8);
+            winner.elo+=K;loser.elo-=K;
+            winner.kills=(winner.kills||0)+0; // elo fight, no kill
+            loser.hp=Math.max(0,loser.hp-Math.floor(Math.random()*12+3));
+            const ws=toScreen(winner.gx,winner.gy);
+            const ls=toScreen(loser.gx,loser.gy);
+            addFloatText(ws.x,ws.y-35,`+${K} ELO`,'#ffd700',9);
+            addFloatText(ls.x,ls.y-35,`-${K} ELO`,'#ff4444',8);
+            addParticle(ws.x,ws.y-10,winner.color,5,2,20);
+            // Winner celebration burst
+            if(Math.random()<0.3){
+              addFloatText(ws.x,ws.y-50,'CRITICAL!','#ff0066',11);
+              addEffect('aoe',{x:ls.x,y:ls.y-5,color:'#ff3333',life:20});
+            }
+          }
+          screenShake(2);
+          await sleep(200);
+
+          // Step 5: Retreat — agents move back
+          for(let pi=0;pi<pairs.length;pi++){
+            const [a,b]=pairs[pi];
+            const op=origPositions[pi];
+            a.targetGx=op.ax;a.targetGy=op.ay;
+            b.targetGx=op.bx;b.targetGy=op.by;
+          }
+          await sleep(100);
+        }
+        addKillFeed(`⚔ Round ${roundNum}/${totalR} — ${pairs.length} duels`,'#ffa500');
+      } else {
+        // Idle — agents face each other and taunt
+        if(alive.length>1){
+          const idx=Math.floor(Math.random()*Math.min(5,alive.length));
+          const a=alive.filter(x=>x.alive)[idx];
+          if(a){
+            const s=toScreen(a.gx,a.gy);
+            addParticle(s.x,s.y-15,a.color,1,1,10);
+            // Occasional taunt text
+            if(Math.random()<0.15){
+              const taunts=['...','!!','?!','>>>'];
+              addFloatText(s.x,s.y-25,taunts[Math.floor(Math.random()*taunts.length)],a.color,7);
+            }
+          }
+        }
+        await sleep(350);
+      }
+    }
+    subEl.textContent='';
+    addKillFeed('Elo tournament in progress','#ffa500');
+  }
+  else if(evtType==='elo_tournament_complete'){
+    screenFlash('#ffa500',.1);screenShake(2);
+    addKillFeed('Elo tournament complete','#ffa500');
+    updateRanks();updateSidebar();
+    await sleep(300);
+  }
+  else if(evtType==='selection_complete'){
+    // KILL agents to match backend count — dramatic elimination sequence
+    screenFlash('#ff0000',.2);screenShake(4);
+    const killed=data.eliminated_count||data.eliminated||0;
+    const survived=data.survived_count||data.survived||0;
+    addKillFeed(`Selection: ${killed} eliminated, ${survived} survived`,'#ff3333');
+    addBattleLog(`Selection: keeping top ${survived} (${killed} eliminated)`);
+    if(killed>0){
+      const alive=aliveAgents().sort((a,b)=>a.elo-b.elo); // weakest first
+      const toKill=Math.min(killed,alive.length-2);
+      for(let i=0;i<toKill;i++){
+        const a=alive[i];
+        const s=toScreen(a.gx,a.gy);
+        // Flash red on target before death
+        addEffect('aoe',{x:s.x,y:s.y-5,color:'#ff0000',life:20});
+        await sleep(60);
+        a.alive=false;a.hp=0;
+        FACTIONS[a.faction].soldiers--;
+        totalKills++;
+        // Death explosion — big particles
+        addParticle(s.x,s.y,'#ff3333',8,4,30);
+        addParticle(s.x,s.y,'#888',5,3,25);
+        addParticle(s.x,s.y,a.color,4,2,20);
+        // Death text
+        const deathTexts=['☠','K.O.','OUT','FALLEN','✖'];
+        addFloatText(s.x,s.y-20,deathTexts[Math.floor(Math.random()*deathTexts.length)],'#ff3333',12);
+        addFloatText(s.x,s.y-40,`ELO ${Math.round(a.elo)}`,'#888',7);
+        addKillFeed(`${a.factionName}#${a.id} ELIMINATED`,'#ff3333');
+        screenShake(3);
+        if(i<3) screenFlash('#ff0000',.08); // flash only first few
+        await sleep(120);
+      }
+    }
+    updateRanks();updateSidebar();
+    await sleep(500);
+  }
+  else if(evtType==='crossover_started'){
+    // Looping breeding particles — runs until next event arrives
+    await announce();
+    const alive=aliveAgents().sort((a,b)=>b.elo-a.elo);
+    let tick=0;
+    while(!hasNextPhaseEvent()){drainStatusUpdates();
+      if(alive.length<2) break;
+      // Pick two random survivors and show fusion with beam + particles
+      const p1=alive[Math.floor(Math.random()*Math.min(alive.length,Math.ceil(alive.length*0.6)))];
+      const p2=alive[Math.floor(Math.random()*alive.length)];
+      if(p1&&p2&&p1!==p2){
+        const s1=toScreen(p1.gx,p1.gy),s2=toScreen(p2.gx,p2.gy);
+        const mx=(s1.x+s2.x)/2,my=(s1.y+s2.y)/2;
+        // DNA fusion beam between parents
+        addEffect('beam',{fx:s1.x,fy:s1.y-10,tx:mx,ty:my-10,color:p1.color,width:2,life:18});
+        addEffect('beam',{fx:s2.x,fy:s2.y-10,tx:mx,ty:my-10,color:p2.color,width:2,life:18});
+        addParticle(mx,my,'#ffd700',4,2,20);
+        addParticle(mx,my,p1.color,2,1,15);
+        addParticle(mx,my,p2.color,2,1,15);
+        // Move parents toward each other
+        p1.targetGx=p1.gx+(p2.gx-p1.gx)*0.08;
+        p1.targetGy=p1.gy+(p2.gy-p1.gy)*0.08;
+        p2.targetGx=p2.gx+(p1.gx-p2.gx)*0.08;
+        p2.targetGy=p2.gy+(p1.gy-p2.gy)*0.08;
+        if(tick%3===0){
+          const fuseTexts=['FUSE','CROSS','MIX','BREED','MERGE'];
+          addFloatText(mx,my-15,fuseTexts[Math.floor(Math.random()*fuseTexts.length)],'#ffd700',8);
+          camPanTo((p1.gx+p2.gx)/2,(p1.gy+p2.gy)/2,1.3);
+        }
+      }
+      tick++;
+      await sleep(220);
+    }
+  }
+  else if(evtType==='crossover_complete'){
+    // Create new child agents
+    screenFlash('#ffd700',.1);
+    const born=data.children_count||data.new_count||0;
+    addKillFeed(`Crossover: ${born} children born`,'#ffd700');
+    addBattleLog(`Crossover: ${born} children born, population restored`);
+    const alive=aliveAgents().sort((a,b)=>b.elo-a.elo);
+    for(let i=0;i<born;i++){
+      if(alive.length<2) break;
+      const p1=alive[Math.floor(Math.random()*Math.min(alive.length,Math.ceil(alive.length*0.6)))];
+      const p2=alive[Math.floor(Math.random()*alive.length)];
+      if(!p1||!p2) continue;
+      const child=makeAgent(agents.length,Math.random()>0.5?p1.faction:p2.faction);
+      child.gx=(p1.gx+p2.gx)/2+(Math.random()-0.5)*4;
+      child.gy=(p1.gy+p2.gy)/2+(Math.random()-0.5)*4;
+      child.elo=(p1.elo+p2.elo)/2+Math.random()*20-10;
+      child.hp=100;child.gen=currentGen+1;child.chute=false;child.chuteY=0;
+      child.fitness={
+        feasibility:(p1.fitness.feasibility+p2.fitness.feasibility)/2+Math.random()*5,
+        innovation:Math.max(p1.fitness.innovation,p2.fitness.innovation)+Math.random()*3,
+        specificity:(p1.fitness.specificity+p2.fitness.specificity)/2+Math.random()*5,
+        cost:(p1.fitness.cost+p2.fitness.cost)/2+Math.random()*5
+      };
+      child.parents=`${p1.factionName}#${p1.id} × ${p2.factionName}#${p2.id}`;
+      agents.push(child);
+      FACTIONS[child.faction].soldiers++;
+      const s=toScreen(child.gx,child.gy);
+      addParticle(s.x,s.y,child.color,4,2,20);
+      addFloatText(s.x,s.y-20,'BORN','#ffd700',9);
+      addKillFeed(`${child.factionName}#${child.id} FUSED`,child.color);
+      if(i%4===0) await sleep(80);
+    }
+    updateRanks();updateSidebar();
+    await sleep(300);
+  }
+  else if(evtType==='mutation_complete'){
+    screenFlash('#aa00ff',.1);
+    const mutated=data.mutated_count||0;
+    addKillFeed(`Mutation: ${mutated} mutated`,'#aa00ff');
+    const children=aliveAgents().filter(a=>a.gen>=currentGen+1);
+    let mutCount=0;
+    // Chain lightning connects all mutated agents
+    const mutatedScreenPoints=[];
+    for(const a of children){
+      if(mutCount>=mutated) break;
+      if(Math.random()<0.5){
+        a.mutated=true;
+        a.elo+=((Math.random()-0.3)*40);
+        a.fitness.innovation+=Math.random()*15;
+        const s=toScreen(a.gx,a.gy);
+        mutatedScreenPoints.push({x:s.x,y:s.y-10});
+        addParticle(s.x,s.y,'#aa00ff',6,3,25);
+        addParticle(s.x,s.y,'#ffffff',3,2,15);
+        const tier=getTier(a);
+        const upgradeText=tier>=4?`★ T${tier} ★`:tier>1?`UPGRADE T${tier}`:'MUTATED';
+        addFloatText(s.x,s.y-20,upgradeText,'#aa00ff',tier>=3?11:9);
+        // Shield effect during mutation
+        addEffect('shield',{x:s.x,y:s.y,color:'#aa00ff',life:25});
+        camPanTo(a.gx,a.gy,1.5);
+        screenShake(1);
+        mutCount++;
+        await sleep(180);
+      }
+    }
+    // Final lightning chain connecting all mutated agents
+    if(mutatedScreenPoints.length>=2){
+      addEffect('lightning',{points:mutatedScreenPoints,color:'#aa00ff',life:30});
+      screenFlash('#aa00ff',.08);screenShake(3);
+    }
+    updateRanks();updateSidebar();
+    await sleep(300);
+  }
+  else if(evtType==='homogeneity_culled'){
+    screenFlash('#ff8800',.1);
+    const culled=data.culled_count||data.killed_count||0;
+    addKillFeed(`Clone cull: ${culled} removed`,'#ff8800');
+    // Kill clones (weakest children)
+    if(culled>0){
+      const children=aliveAgents().filter(a=>a.gen>=currentGen+1).sort((a,b)=>a.elo-b.elo);
+      for(let i=0;i<Math.min(culled,children.length);i++){
+        const a=children[i];
+        a.alive=false;a.hp=0;
+        FACTIONS[a.faction].soldiers--;totalKills++;
+        const s=toScreen(a.gx,a.gy);
+        addParticle(s.x,s.y,'#ff8800',4,2,20);
+        addKillFeed(`${a.factionName}#${a.id} CLONE CULLED`,'#ff8800');
+      }
+    }
+    updateRanks();updateSidebar();
+    await sleep(300);
+  }
+  else if(evtType==='fresh_blood_injected'){
+    screenFlash('#00ffcc',.15);
+    const injected=data.injected_count||data.count||0;
+    addKillFeed(`Fresh blood: ${injected} injected`,'#00ffcc');
+    for(let i=0;i<injected;i++){
+      const fIdx=Math.floor(Math.random()*FACTIONS.length);
+      const a=makeAgent(agents.length,fIdx);
+      a.gx=Math.random()*COLS;a.gy=Math.random()*ROWS;
+      a.gen=currentGen+1;a.hp=100;
+      a.elo=1000+Math.random()*100-50;
+      a.chute=true;a.chuteY=-200-Math.random()*200;
+      agents.push(a);FACTIONS[fIdx].soldiers++;
+      const s=toScreen(a.gx,a.gy);
+      addFloatText(s.x,s.y-20,'FRESH','#00ffcc',10);
+      addKillFeed(`${a.factionName}#${a.id} deployed (fresh blood)`,a.color);
+      if(i%3===0) await sleep(60);
+    }
+    updateRanks();updateSidebar();
+    await sleep(300);
+  }
+  else if(evtType==='red_team_started'){
+    await announce();
+    // Spawn red monsters and loop attack animation until next event
+    const alive=aliveAgents().sort((a,b)=>b.elo-a.elo);
+    for(let i=0;i<Math.min(3,alive.length);i++){
+      const a=alive[i];
+      redMonsters.push({gx:a.gx+3,gy:a.gy+2,targetGx:a.gx,targetGy:a.gy,alive:true,hp:100,timer:Date.now()});
+    }
+    let tick=0;
+    while(!hasNextPhaseEvent()){drainStatusUpdates();
+      if(tick%2===0){
+        // Red monster attack with beam
+        const target=alive[Math.floor(Math.random()*Math.min(5,alive.length))];
+        if(target&&redMonsters.length>0){
+          const monster=redMonsters[tick%redMonsters.length];
+          const ms=toScreen(monster.gx,monster.gy);
+          const ts=toScreen(target.gx,target.gy);
+          addEffect('beam',{fx:ms.x,fy:ms.y-10,tx:ts.x,ty:ts.y-8,color:'#ff0000',width:3,life:20});
+          addParticle(ts.x,ts.y,'#ff0000',4,3,20);
+          target.hp=Math.max(10,target.hp-3);
+          const attacks=['EXPLOIT','ATTACK','PROBE','BREACH'];
+          if(tick%4===0) addFloatText(ms.x,ms.y-25,attacks[Math.floor(Math.random()*attacks.length)],'#ff4444',8);
+          // Target flashes shield in defense
+          if(Math.random()<0.4) addEffect('shield',{x:ts.x,y:ts.y,color:target.color,life:15});
+          screenFlash('#ff0000',.05);
+        }
+      }
+      if(tick%5===0) screenShake(2);
+      // Move monsters toward targets
+      for(const m of redMonsters){
+        const t=alive[Math.floor(Math.random()*Math.min(3,alive.length))];
+        if(t){m.targetGx=t.gx+2;m.targetGy=t.gy+1;}
+        m.gx+=(m.targetGx-m.gx)*0.05;
+        m.gy+=(m.targetGy-m.gy)*0.05;
+      }
+      tick++;
+      await sleep(250);
+    }
+  }
+  else if(evtType==='red_team_attack'){
+    screenFlash('#ff0000',.08);
+    if(data.vulnerability) addKillFeed(`Vuln: ${data.vulnerability}`,'#ff4444');
+    const alive=aliveAgents();
+    if(alive.length>0){
+      const a=alive[Math.floor(Math.random()*Math.min(5,alive.length))];
+      if(a){
+        a.hp=Math.max(10,a.hp-15);
+        a.elo-=Math.random()*30;
+        const s=toScreen(a.gx,a.gy);
+        addParticle(s.x,s.y,'#ff0000',5,3,25);screenShake(3);
+      }
+    }
+    await sleep(200);
+  }
+  else if(evtType==='red_team_complete'){
+    redMonsters=[];
+    addKillFeed('Red team attack complete','#ff4444');
+    await sleep(300);
+  }
+  else if(evtType==='debate_started'){
+    await announce();
+    // Looping debate animation — two top agents face off with speech particles
+    const alive=aliveAgents().sort((a,b)=>b.elo-a.elo);
+    let tick=0;
+    while(!hasNextPhaseEvent()){drainStatusUpdates();
+      if(alive.length<2) break;
+      const a=alive[tick%Math.min(5,alive.length)];
+      const b=alive[(tick+1)%Math.min(5,alive.length)];
+      if(a&&b&&a!==b){
+        const sa=toScreen(a.gx,a.gy),sb=toScreen(b.gx,b.gy);
+        addParticle(sa.x,sa.y-20,'#ffd700',2,1,12);
+        addParticle(sb.x,sb.y-20,'#00ccff',2,1,12);
+        if(tick%4===0){
+          const mx=(sa.x+sb.x)/2,my=(sa.y+sb.y)/2;
+          addFloatText(mx,my-10,'VS','#ffffff',10);
+          camPanTo((a.gx+b.gx)/2,(a.gy+b.gy)/2,1.5);
+        }
+      }
+      tick++;
+      await sleep(350);
+    }
+  }
+  else if(evtType==='debate_round'){
+    screenFlash('#ffd700',.08);
+    addKillFeed(`Debate round ${data.round||'?'}: ${data.winner||'?'} wins`,'#ffd700');
+    await sleep(200);
+  }
+  else if(evtType==='debate_complete'){
+    addKillFeed('Debate complete','#ffd700');
+    await sleep(300);
+  }
+  else if(evtType==='pressure_test_started'){
+    await announce();
+    // Looping storm + meteor animation until next event
+    stormZone.targetRadius=5;
+    while(!hasNextPhaseEvent()){drainStatusUpdates();
+      // Spawn new meteors periodically
+      if(meteors.length<5){
+        meteors.push({
+          sx:Math.random()*COLS,sy:-5,
+          tx:COLS/2+(Math.random()-0.5)*10,ty:ROWS/2+(Math.random()-0.5)*10,
+          progress:0,speed:0.02+Math.random()*0.02
+        });
+      }
+      // Random screen shake for pressure effect
+      if(Math.random()<0.3) screenShake(2);
+      // Damage random agents slightly
+      const alive=aliveAgents();
+      if(alive.length>0){
+        const a=alive[Math.floor(Math.random()*alive.length)];
+        const s=toScreen(a.gx,a.gy);
+        addParticle(s.x,s.y,'#ff6600',2,2,10);
+      }
+      await sleep(400);
+    }
+  }
+  else if(evtType==='pressure_test_complete'){
+    screenFlash('#ff6600',.1);screenShake(3);
+    stormZone.targetRadius=COLS/2+2;
+    meteors=[];
+    addKillFeed('Pressure test complete','#ff6600');
+    await sleep(300);
+  }
+  else if(evtType==='refinement_started'){
+    await announce();
+    forgeActive=true;
+    // Move top agent to forge center and loop forge particles until next event
+    const top=aliveAgents().sort((a,b)=>b.elo-a.elo)[0];
+    if(top){camPanTo(COLS/2,ROWS/2,2);top.targetGx=COLS/2;top.targetGy=ROWS/2;}
+    let tick=0;
+    while(!hasNextPhaseEvent()){drainStatusUpdates();
+      // Forge particle ring around center
+      const cx=COLS/2,cy=ROWS/2;
+      const angle=(tick*0.3)%(Math.PI*2);
+      const sc=toScreen(cx+Math.cos(angle)*3,cy+Math.sin(angle)*3);
+      addParticle(sc.x,sc.y,'#ffd700',3,2,18);
+      if(tick%5===0){
+        const sc2=toScreen(cx,cy);
+        addFloatText(sc2.x,sc2.y-25,'REFINING...','#ffd700',8);
+        screenFlash('#ffd700',.04);
+      }
+      tick++;
+      await sleep(200);
+    }
+  }
+  else if(evtType==='refinement_complete'){
+    forgeActive=false;
+    screenFlash('#ffd700',.15);
+    addKillFeed('Refinement complete — champion forged','#ffd700');
+    camReset();
+    await sleep(300);
+  }
+  else if(evtType==='run_complete'){
+    screenFlash('#ffd700',.2);
+    addKillFeed('EVOLUTION COMPLETE','#ffd700');
+    await sleep(500);
+  }
+  else if(evtType==='status_update'){
+    if(data.message) addBattleLog(`[STATUS] ${data.message}`);
+  }
+}
+
+async function processGenSummary(data){
+  currentGen=data.generation||currentGen;
+  document.getElementById('gen-counter').textContent=`GEN ${currentGen}`;
+  addBattleLog(`=== Generation ${currentGen} complete ===`);
+  addBattleLog(`  Best: ${Number(data.best_fitness||0).toFixed(2)} | Avg: ${Number(data.avg_fitness||0).toFixed(2)} | Alive: ${data.alive_count||'?'}`);
+  addKillFeed(`Gen ${currentGen}: best=${Number(data.best_fitness||0).toFixed(2)}`,'#ffd700');
+  screenFlash('#ffd700',.12);
+  for(const a of aliveAgents()) a.hp=Math.min(100,a.hp+30);
+  updateSidebar();
+  await sleep(500);
+}
+
+async function processWarComplete(results){
+  addBattleLog('========== EVOLUTION COMPLETE ==========');
+  addBattleLog(`API calls: ${results.total_api_calls||0} | Cost: $${Number(results.estimated_cost||0).toFixed(3)}`);
+  addBattleLog(`Events: ${results.event_count||0}`);
+  addKillFeed('EVOLUTION COMPLETE','#ffd700');
+  screenFlash('#ffd700',.2);
+  if(results.generations_data){
+    for(const gd of results.generations_data){
+      addBattleLog(`  Gen ${gd.generation}: best=${Number(gd.best_fitness||0).toFixed(2)}, alive=${gd.alive_count}`);
+    }
+  }
+  await sleep(1000);
+  showResults();
+}
+
+// ═══ STANDALONE OVERLAY MODE (legacy — when not backend-driven) ═══
+
+function handleBackendMessageDirect(msg){
+  switch(msg.type){
+    case 'war_started':
+      addBattleLog(`Backend war started: ${msg.config.total} agents`);
+      break;
+    case 'evolution_event':{
+      const evtType=msg.event_type;
+      const data=msg.data||{};
+      const label=evtType.replace(/_/g,' ').toUpperCase();
+      addBattleLog(`[LIVE] ${label}`);
+      const phaseIdx=EVENT_PHASE_MAP[evtType];
+      if(phaseIdx!==undefined){currentPhase=phaseIdx;updatePhaseTimeline();}
+      break;
+    }
+    case 'generation_summary':
+      addBattleLog(`Gen ${msg.data.generation}: best=${Number(msg.data.best_fitness||0).toFixed(2)}`);
+      break;
+    case 'war_complete':
+      addBattleLog('Backend evolution complete');
+      break;
+    case 'pong':
+      break;
+  }
+}
+
+// Attempt WebSocket connection on load
+connectWebSocket();
+</script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+</body>
+</html>

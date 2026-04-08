@@ -17,6 +17,7 @@ async def run_swiss_tournament(
     judge_models: list[str],
     dimensions_text: str,
     max_rounds: int = 0,
+    on_progress: callable = None,
 ) -> dict[str, float]:
     """Run a Swiss-system Elo tournament.
 
@@ -119,5 +120,13 @@ async def run_swiss_tournament(
 
             ratings[winner_id] = _elo_update(ratings[winner_id], expected_w, 1.0)
             ratings[loser_id] = _elo_update(ratings[loser_id], expected_l, 0.0)
+
+        # Emit round progress
+        if on_progress:
+            try:
+                on_progress(round_num + 1, max_rounds, len(pairs),
+                            {sid: round(r, 1) for sid, r in sorted(ratings.items(), key=lambda x: -x[1])[:5]})
+            except Exception:
+                pass
 
     return ratings

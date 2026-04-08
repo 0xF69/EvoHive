@@ -424,12 +424,18 @@ async def run_evolution(
         # ── a. 绝对评审 ──
         _log("评审中...")
         _emit(evt.EVALUATION_STARTED, "evolution", generation=gen+1)
+
+        def _eval_progress(done, total, sol_id):
+            _emit("evaluation_progress", "evolution",
+                  generation=gen+1, done=done, total=total, solution_id=sol_id)
+
         judgments = await evaluate_population(
             population,
             config.judge_dimensions,
             judge_models[0],
             rounds=config.judge_rounds,
             diversity_weight=config.diversity_weight,
+            on_progress=_eval_progress,
         )
         run.total_api_calls += len(population) * config.judge_rounds
         _emit(evt.EVALUATION_COMPLETE, "evolution", generation=gen+1)
@@ -462,8 +468,15 @@ async def run_evolution(
 
             if use_swiss:
                 from evohive.engine.swiss_tournament import run_swiss_tournament
+
+                def _elo_progress(round_num, total_rounds, n_pairs, top5_ratings):
+                    _emit("elo_round_complete", "evolution",
+                          generation=gen+1, round=round_num, total_rounds=total_rounds,
+                          n_pairs=n_pairs, top5=top5_ratings)
+
                 elo_ratings = await run_swiss_tournament(
                     population, config.problem, judge_models, dimensions_text,
+                    on_progress=_elo_progress,
                 )
                 # Swiss tournament uses ~N*log2(N)/2 comparisons
                 import math

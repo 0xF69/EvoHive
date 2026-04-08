@@ -334,18 +334,28 @@ async def evaluate_population(
     model: str,
     rounds: int = 1,
     diversity_weight: float = 0.15,
+    on_progress: callable = None,
 ) -> list[StableJudgment]:
     """评估整个种群"""
     import asyncio
 
     # 并发评审所有Solution
     sem = asyncio.Semaphore(25)
+    completed = [0]  # mutable counter for closure
+    total = len(solutions)
 
-    async def eval_one(sol):
+    async def eval_one(sol_idx, sol):
         async with sem:
-            return await evaluate_solution(sol, dimensions, model, rounds)
+            result = await evaluate_solution(sol, dimensions, model, rounds)
+            completed[0] += 1
+            if on_progress:
+                try:
+                    on_progress(completed[0], total, sol.id)
+                except Exception:
+                    pass
+            return result
 
-    judgments = await asyncio.gather(*[eval_one(s) for s in solutions])
+    judgments = await asyncio.gather(*[eval_one(i, s) for i, s in enumerate(solutions)])
 
     # 计算多样性加分 (embedding-based)
     if diversity_weight > 0:
