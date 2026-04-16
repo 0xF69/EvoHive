@@ -20,13 +20,18 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(
 /* === LAYOUT === */
 #app{display:flex;width:100%;height:100%}
 #canvas-wrap{flex:1;position:relative;overflow:hidden}
-canvas{display:block;width:100%;height:100%}
-#sidebar{width:280px;background:var(--panel);border-left:2px solid var(--border);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0}
+canvas{display:block;width:100%;height:100%;cursor:grab}
+#sidebar{width:280px;background:var(--panel);border-left:2px solid var(--border);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0;transition:width .25s ease,transform .25s ease,border-color .25s ease}
+#sidebar.collapsed{width:0;border-left-color:transparent}
+#sidebar.collapsed > *{opacity:0;pointer-events:none}
 /* === SIDEBAR === */
 .sb-header{padding:8px 12px;background:#0a150a;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.sb-header-actions{display:flex;align-items:center;gap:8px}
 .sb-title{font-family:'Press Start 2P',monospace;font-size:9px;color:var(--gold);letter-spacing:1px}
 #lang-btn{background:none;border:1px solid var(--dim);color:var(--text);font-family:'Share Tech Mono',monospace;font-size:11px;padding:2px 8px;cursor:pointer;border-radius:2px}
 #lang-btn:hover{border-color:var(--gold);color:var(--gold)}
+#sidebar-toggle{background:none;border:1px solid var(--dim);color:var(--text);font-family:'Share Tech Mono',monospace;font-size:12px;padding:2px 8px;cursor:pointer;border-radius:2px}
+#sidebar-toggle:hover{border-color:var(--gold);color:var(--gold)}
 .sb-section{padding:8px 12px;border-bottom:1px solid var(--border)}
 .sb-label{font-size:9px;color:var(--dim);text-transform:uppercase;margin-bottom:4px;font-family:'Press Start 2P',monospace;letter-spacing:1px}
 /* Phase indicator */
@@ -37,6 +42,25 @@ canvas{display:block;width:100%;height:100%}
 .stat-box{flex:1;min-width:70px;background:#0a150a;border:1px solid var(--border);border-radius:2px;padding:4px 6px;text-align:center}
 .stat-val{font-family:'Press Start 2P',monospace;font-size:10px;color:var(--hp-high)}
 .stat-lbl{font-size:9px;color:var(--dim);margin-top:2px}
+.mission-card{background:#0a150a;border:1px solid var(--border);border-radius:6px;padding:8px 10px}
+.mission-title{font-family:'Press Start 2P',monospace;font-size:8px;color:var(--gold);margin-bottom:6px;letter-spacing:1px}
+.mission-body{font-size:10px;line-height:1.55;color:var(--text);max-height:72px;overflow:hidden}
+.progress-card{background:#0a150a;border:1px solid var(--border);border-radius:6px;padding:10px}
+.progress-head{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:8px}
+.progress-title{font-family:'Press Start 2P',monospace;font-size:8px;color:var(--gold);letter-spacing:1px}
+.progress-pct{font-family:'Press Start 2P',monospace;font-size:9px;color:var(--hp-high)}
+.progress-bar{height:8px;background:#142014;border-radius:999px;overflow:hidden;border:1px solid rgba(107,143,107,.18)}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--hp-high),#7dffb1);width:0%;transition:width .35s ease}
+.progress-stage{font-size:10px;color:var(--text);margin-top:8px}
+.progress-status{font-size:9px;color:var(--dim);line-height:1.5;margin-top:6px;min-height:28px}
+.progress-card.error{border-color:rgba(255,51,51,.5);background:linear-gradient(180deg,rgba(42,10,10,.95),rgba(20,8,8,.92))}
+.progress-card.error .progress-title,.progress-card.error .progress-pct{color:#ff7777}
+.progress-card.error .progress-fill{background:linear-gradient(90deg,#ff5555,#ff9a7a)}
+.progress-card.error .progress-status{color:#ffd0d0}
+.telemetry-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.telemetry-box{background:#0a150a;border:1px solid var(--border);border-radius:6px;padding:8px}
+.telemetry-val{font-family:'Press Start 2P',monospace;font-size:10px;color:var(--hp-high)}
+.telemetry-lbl{font-size:9px;color:var(--dim);margin-top:4px}
 /* Faction list */
 .faction-card{display:flex;align-items:center;gap:8px;padding:4px 0;cursor:pointer;border-radius:2px;transition:background .2s}
 .faction-card:hover{background:rgba(255,255,255,.05)}
@@ -57,6 +81,28 @@ canvas{display:block;width:100%;height:100%}
 #hud{position:absolute;top:0;left:0;right:0;display:flex;justify-content:center;align-items:center;padding:8px 16px;pointer-events:none;z-index:10}
 #alive-counter{font-family:'Press Start 2P',monospace;font-size:14px;color:var(--hp-high);text-shadow:0 0 10px rgba(0,255,65,.5)}
 #gen-counter{font-family:'Press Start 2P',monospace;font-size:10px;color:var(--gold);margin-left:20px}
+#mission-rail{position:absolute;top:48px;left:50%;transform:translateX(-50%);z-index:10;pointer-events:none;display:flex;align-items:center;gap:10px;max-width:min(720px,calc(100vw - 340px));padding:10px 14px;background:linear-gradient(180deg,rgba(7,14,10,.86),rgba(7,14,10,.68));border:1px solid rgba(107,143,107,.26);border-radius:12px;box-shadow:0 18px 40px rgba(0,0,0,.25)}
+.mission-rail-kicker{font-family:'Press Start 2P',monospace;font-size:8px;color:var(--gold);letter-spacing:1px;flex-shrink:0}
+.mission-rail-text{font-size:10px;line-height:1.5;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mission-rail-tip{font-size:9px;color:var(--dim);flex-shrink:0}
+#broadcast-card{position:absolute;top:94px;left:50%;transform:translateX(-50%);z-index:10;pointer-events:none;display:flex;flex-direction:column;gap:8px;max-width:min(760px,calc(100vw - 360px));padding:12px 14px;background:linear-gradient(180deg,rgba(7,14,10,.92),rgba(7,14,10,.74));border:1px solid rgba(107,143,107,.26);border-radius:14px;box-shadow:0 18px 40px rgba(0,0,0,.25)}
+.broadcast-head{display:flex;justify-content:space-between;gap:10px;align-items:center}
+.broadcast-kicker{font-family:'Press Start 2P',monospace;font-size:8px;color:var(--gold);letter-spacing:1px}
+.broadcast-tag{font-size:9px;color:var(--dim)}
+.broadcast-title{font-family:'Press Start 2P',monospace;font-size:10px;line-height:1.5;color:#eef6ee}
+.broadcast-sub{font-size:10px;line-height:1.6;color:var(--dim)}
+.broadcast-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:10px}
+.broadcast-panel{background:rgba(255,255,255,.03);border:1px solid rgba(107,143,107,.18);border-radius:10px;padding:10px 12px}
+.broadcast-panel-label{font-family:'Press Start 2P',monospace;font-size:7px;color:var(--gold);letter-spacing:1px;margin-bottom:6px}
+.broadcast-champion{font-size:11px;line-height:1.6;color:var(--text)}
+.broadcast-meta{font-size:10px;line-height:1.55;color:var(--dim)}
+.broadcast-summary{font-size:10px;line-height:1.65;color:var(--text)}
+#canvas-wrap::before{content:'';position:absolute;inset:0;pointer-events:none;z-index:1;background:
+  linear-gradient(rgba(74,158,255,.07),rgba(74,158,255,0) 24%),
+  linear-gradient(90deg,rgba(255,255,255,.04) 1px,transparent 1px),
+  linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px);
+  background-size:100% 100%,28px 28px,28px 28px;mix-blend-mode:screen;opacity:.45}
+#canvas-wrap::after{content:'';position:absolute;inset:0;pointer-events:none;z-index:2;background:radial-gradient(circle at center,transparent 42%,rgba(0,0,0,.42) 100%)}
 /* === CINEMATIC BARS === */
 .cine-bar{position:absolute;left:0;right:0;height:0;background:#000;z-index:20;transition:height .4s}
 #cine-top{top:0}
@@ -68,35 +114,113 @@ canvas{display:block;width:100%;height:100%}
 /* === RESULTS OVERLAY === */
 #results{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:50;display:none;overflow-y:auto;padding:40px}
 .res-inner{max-width:700px;margin:0 auto}
+.res-hero{background:linear-gradient(180deg,rgba(13,26,13,.95),rgba(8,17,8,.9));border:1px solid rgba(107,143,107,.3);border-radius:14px;padding:22px 20px;margin-bottom:18px;box-shadow:0 30px 80px rgba(0,0,0,.3)}
 .res-crown{text-align:center;font-size:48px;margin-bottom:8px}
 .res-champ{text-align:center;font-family:'Press Start 2P',monospace;font-size:14px;color:var(--gold);margin-bottom:4px}
 .res-champ-sub{text-align:center;font-size:12px;color:var(--dim);margin-bottom:24px}
+.res-pill-row{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:10px 0 18px}
+.res-pill{padding:6px 10px;border-radius:999px;background:rgba(255,255,255,.04);border:1px solid rgba(107,143,107,.22);font-size:10px;color:var(--text)}
+.res-mission{background:#0a150a;border:1px solid rgba(107,143,107,.22);border-radius:10px;padding:12px 14px;font-size:11px;line-height:1.7;color:var(--text)}
+.res-mission strong{display:block;font-family:'Press Start 2P',monospace;font-size:8px;color:var(--gold);margin-bottom:8px}
 .res-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px}
 .res-card{background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:12px;text-align:center}
 .res-card-val{font-family:'Press Start 2P',monospace;font-size:14px;color:var(--hp-high)}
 .res-card-lbl{font-size:10px;color:var(--dim);margin-top:4px}
 .res-section{margin-bottom:20px}
 .res-section-title{font-family:'Press Start 2P',monospace;font-size:10px;color:var(--gold);margin-bottom:8px;border-bottom:1px solid var(--border);padding-bottom:4px}
+.res-summary-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:14px;margin-bottom:20px}
+.res-summary-card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px}
+.res-summary-card.error{border-color:rgba(255,51,51,.45);background:linear-gradient(180deg,rgba(42,10,10,.95),rgba(20,8,8,.92))}
+.res-summary-text{font-size:11px;line-height:1.7;color:var(--text)}
+.res-list{display:flex;flex-direction:column;gap:8px}
+.res-list-row{display:flex;justify-content:space-between;gap:10px;font-size:10px;border-bottom:1px solid rgba(255,255,255,.05);padding-bottom:6px}
+.res-list-row:last-child{border-bottom:none;padding-bottom:0}
+.res-list-row span:first-child{color:var(--dim)}
+.res-timeline{display:flex;flex-direction:column;gap:10px}
+.res-timeline-row{display:grid;grid-template-columns:56px 1fr 56px;gap:10px;align-items:center;font-size:10px}
+.res-timeline-gen{font-family:'Press Start 2P',monospace;color:var(--gold)}
+.res-timeline-bar{height:8px;background:#142014;border-radius:999px;overflow:hidden;border:1px solid rgba(107,143,107,.18)}
+.res-timeline-fill{height:100%;background:linear-gradient(90deg,#4a9eff,#00ff41)}
+.res-timeline-meta{color:var(--dim);text-align:right}
+.res-log{background:#0a150a;border:1px solid rgba(107,143,107,.22);border-radius:10px;padding:12px;max-height:220px;overflow-y:auto}
+.res-log-entry{font-size:10px;line-height:1.55;color:var(--text);padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+.res-log-entry:last-child{border-bottom:none}
 .res-faction-row{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:11px}
 .res-rank-row{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:11px;border-bottom:1px solid rgba(255,255,255,.05)}
 .res-rank-num{font-family:'Press Start 2P',monospace;font-size:10px;width:24px;text-align:center}
 #res-answer{background:#0a150a;border:1px solid var(--border);border-radius:4px;padding:12px;font-size:11px;line-height:1.6;color:var(--text);max-height:200px;overflow-y:auto;margin-top:8px}
-#restart-btn{display:block;margin:24px auto 0;background:var(--gold);color:#000;font-family:'Press Start 2P',monospace;font-size:10px;border:none;padding:10px 24px;cursor:pointer;border-radius:2px}
-#restart-btn:hover{background:#fff}
+.res-action-btn{display:block;margin:24px auto 0;background:var(--gold);color:#000;font-family:'Press Start 2P',monospace;font-size:10px;border:none;padding:10px 24px;cursor:pointer;border-radius:2px}
+.res-action-btn:hover{background:#fff}
 /* === AGENT DETAIL POPUP === */
 #agent-detail{position:absolute;background:var(--panel);border:1px solid var(--gold);border-radius:4px;padding:10px;font-size:10px;z-index:15;display:none;pointer-events:none;min-width:180px}
 .ad-name{font-family:'Press Start 2P',monospace;font-size:9px;color:var(--gold);margin-bottom:6px}
 .ad-row{display:flex;justify-content:space-between;margin-bottom:2px}
 .ad-row span:first-child{color:var(--dim)}
+/* War briefing */
+#briefing-panel{position:absolute;top:18px;left:18px;z-index:11;width:min(370px,calc(100vw - 36px));pointer-events:none}
+.briefing-shell{background:linear-gradient(180deg,rgba(7,14,10,.9),rgba(6,11,9,.78));border:1px solid rgba(107,143,107,.45);border-radius:10px;box-shadow:0 20px 60px rgba(0,0,0,.35),inset 0 0 0 1px rgba(255,255,255,.03);backdrop-filter:blur(8px);overflow:hidden}
+.briefing-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:14px 16px 10px;border-bottom:1px solid rgba(107,143,107,.22);background:linear-gradient(90deg,rgba(255,215,0,.08),transparent);pointer-events:auto;cursor:grab}
+.briefing-head:active{cursor:grabbing}
+.briefing-kicker{font-family:'Press Start 2P',monospace;font-size:8px;color:var(--gold);letter-spacing:1.4px;margin-bottom:6px}
+.briefing-title{font-family:'Press Start 2P',monospace;font-size:11px;line-height:1.5;color:#eef6ee}
+.briefing-status{font-size:10px;color:var(--dim);text-align:right;line-height:1.5}
+.briefing-actions{display:flex;align-items:center;gap:8px;pointer-events:auto}
+.briefing-size-group{display:flex;align-items:center;gap:4px}
+.briefing-size-btn{height:28px;min-width:34px;padding:0 8px;border-radius:7px;border:1px solid rgba(107,143,107,.28);background:rgba(9,19,11,.92);color:var(--text);font-family:'Share Tech Mono',monospace;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.briefing-size-btn:hover{border-color:var(--gold);color:var(--gold);background:#102010}
+.briefing-toggle{width:28px;height:28px;border-radius:7px;border:1px solid rgba(107,143,107,.28);background:rgba(9,19,11,.92);color:var(--gold);font-family:'Press Start 2P',monospace;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.briefing-toggle:hover{border-color:var(--gold);background:#102010}
+.briefing-body{padding:12px 16px 14px}
+#briefing-panel.minimized .briefing-body{display:none}
+#briefing-panel.minimized .briefing-head{border-bottom:none}
+.briefing-mini{display:none;padding:0 16px 14px;font-size:10px;line-height:1.5;color:var(--dim);pointer-events:none}
+#briefing-panel.minimized .briefing-mini{display:block}
+.briefing-resize{position:absolute;right:8px;bottom:8px;width:18px;height:18px;pointer-events:auto;cursor:nwse-resize;display:flex;align-items:flex-end;justify-content:flex-end}
+.briefing-resize::before{content:'';width:12px;height:12px;background:
+  linear-gradient(135deg,transparent 0 42%,rgba(255,215,0,.85) 42% 50%,transparent 50% 100%),
+  linear-gradient(135deg,transparent 0 62%,rgba(255,215,0,.55) 62% 70%,transparent 70% 100%);
+  opacity:.9}
+#briefing-panel.minimized .briefing-resize{display:none}
+.briefing-copy{font-size:11px;line-height:1.6;color:#d9ead9;margin-bottom:12px}
+.briefing-problem{margin-bottom:12px;padding:10px 12px;background:rgba(255,255,255,.03);border:1px solid rgba(107,143,107,.22);border-radius:8px}
+.briefing-problem-label{font-family:'Press Start 2P',monospace;font-size:7px;color:var(--gold);letter-spacing:1px;margin-bottom:6px}
+.briefing-problem-text{font-size:10px;line-height:1.55;color:#eef6ee;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+.doctrine-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.doctrine-card{background:rgba(10,21,10,.8);border:1px solid rgba(107,143,107,.26);border-radius:8px;padding:10px 8px}
+.doctrine-label{font-family:'Press Start 2P',monospace;font-size:7px;line-height:1.5;color:var(--dim);margin-bottom:4px}
+.doctrine-value{font-size:11px;line-height:1.45;color:#f2fff2}
+.legend-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.legend-title{font-family:'Press Start 2P',monospace;font-size:8px;color:var(--gold);letter-spacing:1px}
+.legend-note{font-size:10px;color:var(--dim)}
+.tier-strip{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.tier-chip{background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.02));border:1px solid rgba(107,143,107,.22);border-radius:8px;padding:8px 6px;min-height:68px}
+.tier-chip strong{display:block;font-family:'Press Start 2P',monospace;font-size:8px;margin-bottom:5px}
+.tier-chip span{display:block;font-size:10px;color:#eff8ef;line-height:1.35}
+.tier-chip em{display:block;font-size:9px;color:var(--dim);font-style:normal;margin-top:3px}
+.phase-legend{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:12px}
+.phase-legend-item{display:flex;gap:8px;align-items:flex-start;padding:8px;border-left:2px solid rgba(255,215,0,.4);background:rgba(10,21,10,.52);border-radius:0 8px 8px 0}
+.phase-legend-item strong{display:block;font-size:10px;color:#f5fff5;margin-bottom:2px}
+.phase-legend-item span{display:block;font-size:9px;line-height:1.45;color:var(--dim)}
 /* Scrollbar */
 ::-webkit-scrollbar{width:4px}
 ::-webkit-scrollbar-track{background:var(--bg)}
 ::-webkit-scrollbar-thumb{background:var(--dim);border-radius:2px}
 /* Controls bar */
-#controls{position:absolute;bottom:12px;left:12px;z-index:10;pointer-events:auto;display:flex;gap:4px}
+#controls{position:absolute;bottom:12px;left:12px;z-index:10;pointer-events:auto;display:flex;gap:6px;align-items:center;flex-wrap:wrap;max-width:min(420px,calc(100vw - 24px))}
+#controls-meta{display:flex;flex-direction:column;gap:2px;margin-right:2px}
+.controls-label{font-family:'Press Start 2P',monospace;font-size:8px;color:var(--gold);letter-spacing:1px}
+.controls-note{font-size:9px;color:var(--dim);line-height:1.3}
 #controls button{background:#1a1a1a;color:var(--hp-high);border:1px solid var(--border);font-family:'Share Tech Mono',monospace;font-size:12px;padding:4px 10px;cursor:pointer;border-radius:2px;transition:all .2s}
 #controls button:hover{border-color:var(--gold);color:var(--gold)}
 #controls button.active{background:var(--gold);color:#000;border-color:var(--gold)}
+#camera-pad{position:absolute;right:14px;bottom:12px;z-index:10;pointer-events:auto;display:flex;flex-direction:column;gap:8px;background:rgba(8,16,8,.88);border:1px solid rgba(107,143,107,.3);border-radius:10px;padding:10px 10px 8px;max-width:170px}
+.camera-pad-head{display:flex;flex-direction:column;gap:2px}
+.camera-pad-title{font-family:'Press Start 2P',monospace;font-size:8px;color:var(--gold);letter-spacing:1px}
+.camera-pad-note{font-size:9px;color:var(--dim);line-height:1.35}
+.camera-pad-grid{display:grid;grid-template-columns:repeat(3,32px);grid-template-rows:repeat(2,32px);gap:6px;align-items:center;justify-items:center}
+.camera-pad-btn{width:32px;height:32px;background:#1a1a1a;color:var(--hp-high);border:1px solid var(--border);font-family:'Share Tech Mono',monospace;font-size:13px;cursor:pointer;border-radius:6px;transition:all .2s}
+.camera-pad-btn:hover{border-color:var(--gold);color:var(--gold)}
+.camera-pad-btn.wide{width:100%;grid-column:1 / span 3;height:32px;font-size:12px}
 /* Phase timeline */
 #phase-timeline{display:flex;gap:2px;margin-top:6px;flex-wrap:wrap}
 .pt-dot{width:8px;height:8px;border-radius:50%;background:#1a1a1a;border:1px solid var(--border);transition:all .3s;position:relative}
@@ -114,14 +238,48 @@ button:focus-visible,#lang-btn:focus-visible{outline:2px solid var(--gold);outli
 .cfg-header h1{font-family:'Press Start 2P',monospace;font-size:12px;color:var(--gold);letter-spacing:2px}
 .cfg-header span{font-size:11px;color:var(--dim)}
 .cfg-body{padding:20px 24px;display:flex;flex-direction:column;gap:20px}
+.cfg-briefing{display:grid;grid-template-columns:1.35fr .95fr;gap:14px}
+.cfg-brief-panel,.cfg-brief-stats{background:#0a150a;border:1px solid var(--border);border-radius:8px;padding:14px}
+.cfg-brief-panel p{font-size:11px;line-height:1.7;color:var(--text)}
+.cfg-brief-stats{display:grid;grid-template-columns:1fr;gap:8px}
+.cfg-brief-item{padding:8px;border-radius:6px;background:rgba(255,255,255,.02);border:1px solid rgba(107,143,107,.18)}
+.cfg-brief-item strong{display:block;font-family:'Press Start 2P',monospace;font-size:7px;color:var(--gold);margin-bottom:4px}
+.cfg-brief-item span{display:block;font-size:10px;line-height:1.5;color:var(--text)}
 .cfg-row{display:flex;gap:20px;align-items:flex-start}
 .cfg-col{flex:1;min-width:0}
 .cfg-label{font-family:'Press Start 2P',monospace;font-size:8px;color:var(--dim);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
+.cfg-problem-box{background:#081108;border:1px solid var(--border);border-radius:8px;padding:12px}
+.cfg-problem-help{font-size:10px;color:var(--dim);line-height:1.5;margin-bottom:8px}
+#cfg-problem{width:100%;min-height:120px;resize:vertical;background:#050b05;color:var(--text);border:1px solid rgba(107,143,107,.35);border-radius:6px;padding:12px;font-family:'Share Tech Mono',monospace;font-size:12px;line-height:1.6}
+#cfg-problem:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 1px rgba(255,215,0,.25)}
+.cfg-problem-meta{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:8px}
+.cfg-problem-counter{font-size:10px;color:var(--dim)}
+.cfg-problem-status{font-size:10px;color:var(--hp-high)}
+.cfg-ops-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.cfg-field{background:#081108;border:1px solid var(--border);border-radius:8px;padding:12px}
+.cfg-select,.cfg-input{width:100%;background:#050b05;color:var(--text);border:1px solid rgba(107,143,107,.35);border-radius:6px;padding:10px 12px;font-family:'Share Tech Mono',monospace;font-size:12px}
+.cfg-toggle{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.cfg-toggle input{accent-color:var(--gold)}
+.cfg-field-help{font-size:9px;color:var(--dim);line-height:1.45;margin-top:6px}
+.cfg-history{background:#081108;border:1px solid var(--border);border-radius:8px;padding:12px}
+.cfg-history-list{display:flex;flex-direction:column;gap:8px;max-height:220px;overflow-y:auto}
+.cfg-history-item{background:#050b05;border:1px solid rgba(107,143,107,.28);border-radius:8px;padding:10px;cursor:pointer;transition:border-color .2s,background .2s}
+.cfg-history-item:hover{border-color:var(--gold);background:#081308}
+.cfg-history-top{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:6px}
+.cfg-history-name{font-size:10px;color:var(--text);font-weight:bold}
+.cfg-history-meta{font-size:9px;color:var(--dim)}
+.cfg-history-problem{font-size:10px;line-height:1.45;color:var(--text);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.cfg-history-actions{display:flex;gap:6px;margin-top:10px}
+.cfg-history-btn{border:1px solid rgba(255,255,255,.12);background:#0b140b;color:var(--text);border-radius:6px;padding:6px 8px;font-size:9px;font-family:inherit;cursor:pointer;letter-spacing:.4px;text-transform:uppercase}
+.cfg-history-btn:hover{border-color:var(--gold);color:var(--gold)}
+.cfg-history-btn.danger:hover{border-color:#ff6a6a;color:#ff6a6a}
+.cfg-history-empty{font-size:10px;color:var(--dim);line-height:1.6}
 .cfg-slider-row{display:flex;align-items:center;gap:12px}
 .cfg-slider-row input[type=range]{flex:1;accent-color:var(--gold);height:6px}
 .cfg-slider-val{font-family:'Press Start 2P',monospace;font-size:14px;color:var(--hp-high);min-width:40px;text-align:right}
 .cfg-gen-row{display:flex;align-items:center;gap:12px;margin-top:8px}
 .cfg-gen-row input[type=range]{flex:1;accent-color:var(--gold);height:6px}
+.cfg-inline-help{font-size:9px;color:var(--dim);line-height:1.5;margin-top:6px}
 /* Provider grid */
 .cfg-providers{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;max-height:400px;overflow-y:auto;padding-right:4px}
 .cfg-prov{background:#0a150a;border:1px solid var(--border);border-radius:4px;padding:8px;cursor:pointer;transition:all .2s;user-select:none}
@@ -148,29 +306,53 @@ button:focus-visible,#lang-btn:focus-visible{outline:2px solid var(--gold);outli
   #alive-counter{font-size:10px}
   #gen-counter{font-size:8px}
   #controls{bottom:8px;left:8px}
+  #camera-pad{right:8px;bottom:8px;max-width:150px}
+  #controls-meta{flex-basis:100%;margin-bottom:2px}
   #controls button{font-size:14px;padding:6px 12px;min-width:36px;min-height:36px}
   #announce-title{font-size:12px}
   #announce-sub{font-size:10px}
+  #briefing-panel{position:absolute;top:52px;left:10px;right:10px;width:auto}
+  #mission-rail{top:42px;left:10px;right:10px;transform:none;max-width:none}
+  #broadcast-card{top:88px;left:10px;right:10px;transform:none;max-width:none}
+  .broadcast-grid{grid-template-columns:1fr}
+  .briefing-status{display:none}
+  .doctrine-grid{grid-template-columns:1fr}
+  .tier-strip{grid-template-columns:repeat(2,1fr)}
+  .phase-legend{grid-template-columns:1fr}
+  .telemetry-grid{grid-template-columns:1fr}
+  .cfg-briefing{grid-template-columns:1fr}
+  .cfg-ops-grid{grid-template-columns:1fr}
   .cfg-providers{grid-template-columns:repeat(2,1fr)}
   .cfg-box{max-width:98vw}
   .cfg-body{padding:12px}
   .cfg-row{flex-direction:column}
   #results{padding:16px}
   .res-grid{grid-template-columns:repeat(2,1fr)}
+  .res-summary-grid{grid-template-columns:1fr}
   .res-inner{max-width:100%}
 }
 @media(max-width:480px){
   .cfg-providers{grid-template-columns:1fr}
+  .tier-strip{grid-template-columns:1fr}
+  .res-grid{grid-template-columns:1fr}
   #controls button{font-size:16px;padding:8px 14px}
+  #camera-pad{display:none}
+  #mission-rail{display:none}
+  #broadcast-card{display:none}
 }
 /* === ONBOARDING HINT === */
 #hint-overlay{position:absolute;bottom:60px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.85);border:1px solid var(--border);border-radius:6px;padding:10px 18px;z-index:12;pointer-events:none;text-align:center;transition:opacity .6s;font-size:11px;color:var(--text);white-space:nowrap}
 #hint-overlay .hint-key{display:inline-block;background:var(--border);color:var(--gold);border-radius:3px;padding:1px 6px;font-family:'Share Tech Mono',monospace;font-size:10px;margin:0 2px}
+#ui-toast{position:absolute;top:92px;right:18px;z-index:14;pointer-events:none;background:rgba(8,16,8,.92);border:1px solid rgba(107,143,107,.3);border-radius:10px;padding:10px 14px;color:var(--text);font-size:10px;line-height:1.5;opacity:0;transform:translateY(-8px);transition:opacity .25s ease,transform .25s ease;max-width:260px}
+#ui-toast.show{opacity:1;transform:translateY(0)}
+#sidebar-peek{position:absolute;top:14px;right:14px;z-index:12;display:none;background:rgba(8,16,8,.92);border:1px solid rgba(107,143,107,.3);color:var(--text);font-family:'Press Start 2P',monospace;font-size:8px;padding:8px 10px;border-radius:8px;cursor:pointer}
+#sidebar-peek:hover{border-color:var(--gold);color:var(--gold)}
 /* === MOBILE SIDEBAR TOGGLE === */
 #mobile-sb-btn{display:none;position:absolute;top:8px;right:8px;z-index:11;background:var(--panel);border:1px solid var(--border);color:var(--text);font-size:18px;padding:4px 8px;border-radius:4px;cursor:pointer}
 @media(max-width:768px){
   #mobile-sb-btn{display:block}
   #sidebar.mobile-show{display:flex;position:fixed;right:0;top:0;bottom:0;z-index:30;width:280px;box-shadow:-4px 0 20px rgba(0,0,0,.6)}
+  #sidebar-peek{display:none!important}
 }
 /* Config error message */
 .cfg-error{color:var(--hp-low);font-size:10px;font-family:'Press Start 2P',monospace;margin-top:4px;display:none}
@@ -184,27 +366,146 @@ button:focus-visible,#lang-btn:focus-visible{outline:2px solid var(--gold);outli
       <span id="alive-counter" role="status" aria-live="polite" aria-label="Alive agents count">ALIVE: 60</span>
       <span id="gen-counter" role="status" aria-label="Current generation">GEN 1</span>
     </div>
+    <div id="mission-rail">
+      <div class="mission-rail-kicker" data-i18n="currentMission">CURRENT MISSION</div>
+      <div class="mission-rail-text" id="mission-rail-text">No mission loaded yet. Configure a problem below and launch the war.</div>
+      <div class="mission-rail-tip" data-i18n="cameraGuide">Drag battlefield to pan, scroll to zoom</div>
+    </div>
+    <div id="broadcast-card">
+      <div class="broadcast-head">
+        <div class="broadcast-kicker" data-i18n="spectatorFeed">SPECTATOR FEED</div>
+        <div class="broadcast-tag" id="broadcast-tag" data-i18n="liveUpdate">Live update</div>
+      </div>
+      <div class="broadcast-title" id="broadcast-title">Awaiting deployment.</div>
+      <div class="broadcast-sub" id="broadcast-sub">Once the run starts, this layer will call out major swings, generation summaries, and champion changes.</div>
+      <div class="broadcast-grid">
+        <div class="broadcast-panel">
+          <div class="broadcast-panel-label" data-i18n="watchNow">WATCH NOW</div>
+          <div class="broadcast-champion" id="broadcast-champion">No champion yet.</div>
+          <div class="broadcast-meta" id="broadcast-meta">Top unit and momentum shifts will appear here.</div>
+        </div>
+        <div class="broadcast-panel">
+          <div class="broadcast-panel-label" data-i18n="roundPulse">ROUND PULSE</div>
+          <div class="broadcast-summary" id="broadcast-summary">Generation summaries, best fitness jumps, and elimination shocks will be summarized here.</div>
+        </div>
+      </div>
+    </div>
+    <div id="briefing-panel">
+      <div class="briefing-shell">
+        <div class="briefing-head">
+          <div>
+            <div class="briefing-kicker" data-i18n="warDoctrine">WAR DOCTRINE</div>
+            <div class="briefing-title" data-i18n="doctrineTitle">Evolution rendered as a real-time battlefield</div>
+          </div>
+          <div class="briefing-actions">
+            <div class="briefing-status">
+              <div data-i18n="liveTelemetry">Live telemetry</div>
+              <div data-i18n="backendDriven">Backend-driven combat</div>
+            </div>
+            <div class="briefing-size-group">
+              <button id="briefing-smaller" class="briefing-size-btn" type="button" aria-label="Make briefing smaller">A-</button>
+              <button id="briefing-larger" class="briefing-size-btn" type="button" aria-label="Make briefing larger">A+</button>
+            </div>
+            <button id="briefing-toggle" class="briefing-toggle" type="button" aria-label="Collapse briefing">-</button>
+          </div>
+        </div>
+        <div class="briefing-body">
+          <div class="briefing-copy" data-i18n="doctrineCopy">Each solution is a soldier, each fitness score is battle power, and each evolutionary operator becomes a visible combat event.</div>
+          <div class="briefing-problem">
+            <div class="briefing-problem-label" data-i18n="currentMission">CURRENT MISSION</div>
+            <div class="briefing-problem-text" id="current-problem-text">No mission loaded yet. Configure a problem below and launch the war.</div>
+          </div>
+          <div class="doctrine-grid">
+            <div class="doctrine-card">
+              <div class="doctrine-label" data-i18n="doctrineUnit">UNIT MODEL</div>
+              <div class="doctrine-value" data-i18n="doctrineUnitValue">Solution = Soldier</div>
+            </div>
+            <div class="doctrine-card">
+              <div class="doctrine-label" data-i18n="doctrinePower">POWER MODEL</div>
+              <div class="doctrine-value" data-i18n="doctrinePowerValue">Fitness = Combat Power</div>
+            </div>
+            <div class="doctrine-card">
+              <div class="doctrine-label" data-i18n="doctrineConflict">CONFLICT MODEL</div>
+              <div class="doctrine-value" data-i18n="doctrineConflictValue">Selection = Battlefield Survival</div>
+            </div>
+          </div>
+          <div class="legend-head">
+            <div class="legend-title" data-i18n="tierDoctrine">TIER DOCTRINE</div>
+            <div class="legend-note" data-i18n="tierDoctrineNote">Power escalates with Elo</div>
+          </div>
+          <div class="tier-strip">
+            <div class="tier-chip"><strong style="color:#8fd18c">T1</strong><span data-i18n="tier1Name">Infantry</span><em data-i18n="tier1Desc">Untested opener</em></div>
+            <div class="tier-chip"><strong style="color:#d7d77a">T2</strong><span data-i18n="tier2Name">Heavy</span><em data-i18n="tier2Desc">Survives first review</em></div>
+            <div class="tier-chip"><strong style="color:#68d8ff">T3</strong><span data-i18n="tier3Name">Mech</span><em data-i18n="tier3Desc">Laser and EMP pressure</em></div>
+            <div class="tier-chip"><strong style="color:#ffb347">T4</strong><span data-i18n="tier4Name">Tank</span><em data-i18n="tier4Desc">Elite orbital force</em></div>
+            <div class="tier-chip"><strong style="color:#ff7de9">T5</strong><span data-i18n="tier5Name">Aircraft</span><em data-i18n="tier5Desc">Top-tier finisher</em></div>
+          </div>
+          <div class="phase-legend">
+            <div class="phase-legend-item">
+              <div>01</div>
+              <div><strong data-i18n="phaseLegendEval">Evaluate as scan</strong><span data-i18n="phaseLegendEvalDesc">Assessment becomes shields, grade flashes, and power readouts over each unit.</span></div>
+            </div>
+            <div class="phase-legend-item">
+              <div>02</div>
+              <div><strong data-i18n="phaseLegendElo">Elo as duel</strong><span data-i18n="phaseLegendEloDesc">Swiss rounds become face-to-face skirmishes with winner momentum and retreat arcs.</span></div>
+            </div>
+            <div class="phase-legend-item">
+              <div>03</div>
+              <div><strong data-i18n="phaseLegendCross">Crossover as fusion</strong><span data-i18n="phaseLegendCrossDesc">Parents fire linking beams and a child unit is forged at the center line.</span></div>
+            </div>
+            <div class="phase-legend-item">
+              <div>04</div>
+              <div><strong data-i18n="phaseLegendMutate">Mutation as lightning</strong><span data-i18n="phaseLegendMutateDesc">Random variation becomes chained electricity, shield spikes, and visible tier upgrades.</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="briefing-mini" id="briefing-mini-text">Mission briefing minimized. Drag the header to move it.</div>
+        <div id="briefing-resize" class="briefing-resize" aria-hidden="true"></div>
+      </div>
+    </div>
     <div id="cine-top" class="cine-bar"></div>
     <div id="cine-bot" class="cine-bar"></div>
     <div id="announce"><div id="announce-title"></div><div id="announce-sub"></div></div>
     <div id="agent-detail"></div>
     <div id="controls">
+      <div id="controls-meta">
+        <div class="controls-label" data-i18n="playbackLabel">PLAYBACK</div>
+        <div class="controls-note" data-i18n="playbackNote">Animation speed only, not model speed</div>
+      </div>
       <button id="pause-btn" title="Pause/Play">⏸</button>
-      <button class="speed-btn active" data-speed="1">1x</button>
-      <button class="speed-btn" data-speed="2">2x</button>
-      <button class="speed-btn" data-speed="4">4x</button>
+      <button class="speed-btn active" data-speed="1" title="Playback speed: 1x">1x</button>
+      <button class="speed-btn" data-speed="2" title="Playback speed: 2x">2x</button>
+      <button class="speed-btn" data-speed="4" title="Playback speed: 4x">4x</button>
       <button id="reset-cam-btn" title="Reset camera">⌂</button>
+    </div>
+    <div id="camera-pad">
+      <div class="camera-pad-head">
+        <div class="camera-pad-title" data-i18n="cameraPad">CAMERA</div>
+        <div class="camera-pad-note" data-i18n="cameraGuide">Drag battlefield to pan, scroll to zoom</div>
+      </div>
+      <div class="camera-pad-grid">
+        <button class="camera-pad-btn" data-cam-move="up" aria-label="Pan up">↑</button>
+        <button class="camera-pad-btn" data-cam-move="left" aria-label="Pan left">←</button>
+        <button class="camera-pad-btn" data-cam-move="right" aria-label="Pan right">→</button>
+        <button class="camera-pad-btn wide" data-cam-move="down" aria-label="Pan down">↓</button>
+      </div>
+      <button class="camera-pad-btn wide" id="camera-focus-btn" aria-label="Center battlefield" data-i18n="centerView">CENTER VIEW</button>
     </div>
     <div id="hint-overlay">
       <span data-i18n="hint">Scroll to zoom · Drag to pan · Click agent for details</span><br>
-      <span class="hint-key">SPACE</span> Pause  <span class="hint-key">1</span><span class="hint-key">2</span><span class="hint-key">3</span> Speed  <span class="hint-key">R</span> Reset cam
+      <span class="hint-key">SPACE</span> Pause  <span class="hint-key">1</span><span class="hint-key">2</span><span class="hint-key">3</span> Speed  <span class="hint-key">WASD</span> Pan  <span class="hint-key">R</span> Reset cam
     </div>
+    <div id="ui-toast"></div>
+    <button id="sidebar-peek" data-i18n="openIntel">OPEN INTEL</button>
     <button id="mobile-sb-btn" aria-label="Toggle sidebar">☰</button>
   </div>
   <div id="sidebar">
     <div class="sb-header">
       <span class="sb-title">EVOHIVE WAR</span>
-      <button id="lang-btn">EN/中</button>
+      <div class="sb-header-actions">
+        <button id="sidebar-toggle" data-i18n="hideIntel">HIDE</button>
+        <button id="lang-btn">EN/中</button>
+      </div>
     </div>
     <div class="sb-section">
       <div class="sb-label" data-i18n="phase">PHASE</div>
@@ -217,6 +518,31 @@ button:focus-visible,#lang-btn:focus-visible{outline:2px solid var(--gold);outli
         <div class="stat-box"><div class="stat-val" id="st-alive">60</div><div class="stat-lbl" data-i18n="alive">ALIVE</div></div>
         <div class="stat-box"><div class="stat-val" id="st-gen">1</div><div class="stat-lbl" data-i18n="gen">GEN</div></div>
         <div class="stat-box"><div class="stat-val" id="st-kills">0</div><div class="stat-lbl" data-i18n="kills">KILLS</div></div>
+      </div>
+    </div>
+    <div class="sb-section">
+      <div class="mission-card">
+        <div class="mission-title" data-i18n="currentMission">CURRENT MISSION</div>
+        <div class="mission-body" id="sidebar-problem-text">No mission loaded yet. Configure a problem below and launch the war.</div>
+      </div>
+    </div>
+    <div class="sb-section">
+      <div class="progress-card">
+        <div class="progress-head">
+          <div class="progress-title" data-i18n="runProgress">RUN PROGRESS</div>
+          <div class="progress-pct" id="st-progress-pct">0%</div>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" id="st-progress-fill"></div></div>
+        <div class="progress-stage" id="st-progress-stage">Standby</div>
+        <div class="progress-status" id="st-progress-status">Waiting for deployment.</div>
+      </div>
+    </div>
+    <div class="sb-section">
+      <div class="telemetry-grid">
+        <div class="telemetry-box"><div class="telemetry-val" id="st-mode">FAST</div><div class="telemetry-lbl" data-i18n="modeLabel">MODE</div></div>
+        <div class="telemetry-box"><div class="telemetry-val" id="st-budget">$0.50</div><div class="telemetry-lbl" data-i18n="budgetLabel">BUDGET</div></div>
+        <div class="telemetry-box"><div class="telemetry-val" id="st-search">OFF</div><div class="telemetry-lbl" data-i18n="searchLabel">SEARCH</div></div>
+        <div class="telemetry-box"><div class="telemetry-val" id="st-api-calls">0</div><div class="telemetry-lbl" data-i18n="apiCalls">API CALLS</div></div>
       </div>
     </div>
     <div class="sb-section" id="faction-list">
@@ -236,9 +562,61 @@ button:focus-visible,#lang-btn:focus-visible{outline:2px solid var(--gold);outli
   <div class="cfg-box">
     <div class="cfg-header">
       <h1>EVOHIVE WAR</h1>
-      <span>Configure your battle royale</span>
+      <span data-i18n="configSubtitle">Configure your evolution theater</span>
     </div>
     <div class="cfg-body">
+      <div class="cfg-briefing">
+        <div class="cfg-brief-panel">
+          <div class="cfg-label" data-i18n="configBriefing">MISSION BRIEFING</div>
+          <p data-i18n="configBriefingCopy">This interface treats model evolution like an RTS campaign: providers become factions, solutions become troops, and every backend event becomes visible combat, fusion, mutation, or collapse.</p>
+        </div>
+        <div class="cfg-brief-stats">
+          <div class="cfg-brief-item">
+            <strong data-i18n="configBriefA">FACTIONS</strong>
+            <span data-i18n="configBriefADesc">Different providers fight as colored armies so model performance reads like territorial control.</span>
+          </div>
+          <div class="cfg-brief-item">
+            <strong data-i18n="configBriefB">GENERATIONS</strong>
+            <span data-i18n="configBriefBDesc">Each generation is a war round with evaluation, duels, elimination, crossover, and mutation.</span>
+          </div>
+          <div class="cfg-brief-item">
+            <strong data-i18n="configBriefC">TELEMETRY</strong>
+            <span data-i18n="configBriefCDesc">Frontend timing follows backend events, so faster APIs create faster combat pacing.</span>
+          </div>
+        </div>
+      </div>
+      <div class="cfg-problem-box">
+        <div class="cfg-label" data-i18n="problemInputLabel">MISSION / USER QUESTION</div>
+        <div class="cfg-problem-help" data-i18n="problemInputHelp">Describe the real problem EvoHive should solve. This prompt will be sent to the backend evolution engine.</div>
+        <textarea id="cfg-problem" placeholder="Example: Design a GTM strategy for an AI coding review tool targeting indie developers."></textarea>
+        <div class="cfg-problem-meta">
+          <div class="cfg-problem-counter"><span id="cfg-problem-count">0</span> <span data-i18n="charsCount">chars</span></div>
+          <div class="cfg-problem-status" id="cfg-problem-status" data-i18n="problemReady">Ready for deployment</div>
+        </div>
+      </div>
+      <div class="cfg-ops-grid">
+        <div class="cfg-field">
+          <div class="cfg-label" data-i18n="modeLabel">MODE</div>
+          <select id="cfg-mode" class="cfg-select">
+            <option value="fast">FAST</option>
+            <option value="deep">DEEP</option>
+          </select>
+          <div class="cfg-field-help" data-i18n="modeHelp">Fast is cheaper and shorter. Deep spends more time on post-evolution combat.</div>
+        </div>
+        <div class="cfg-field">
+          <div class="cfg-label" data-i18n="budgetLabel">BUDGET</div>
+          <input id="cfg-budget" class="cfg-input" type="number" min="0.1" step="0.1" value="0.5">
+          <div class="cfg-field-help" data-i18n="budgetHelp">Soft cap in USD for the backend evolution run.</div>
+        </div>
+        <div class="cfg-field">
+          <div class="cfg-label" data-i18n="searchLabel">SEARCH</div>
+          <label class="cfg-toggle">
+            <span data-i18n="searchToggle">Enable web search context</span>
+            <input id="cfg-search" type="checkbox">
+          </label>
+          <div class="cfg-field-help" data-i18n="searchHelp">Useful for market or current-event questions when search APIs are configured.</div>
+        </div>
+      </div>
       <div class="cfg-row">
         <div class="cfg-col">
           <div class="cfg-label">AGENTS (POPULATION)</div>
@@ -246,16 +624,22 @@ button:focus-visible,#lang-btn:focus-visible{outline:2px solid var(--gold);outli
             <input type="range" id="cfg-agents" min="10" max="200" step="10" value="60">
             <div class="cfg-slider-val" id="cfg-agents-val">60</div>
           </div>
+          <div class="cfg-inline-help" data-i18n="agentsHelp">More agents increases diversity and cost. Use smaller populations for quick exploratory runs.</div>
           <div class="cfg-label" style="margin-top:14px">GENERATIONS</div>
           <div class="cfg-gen-row">
             <input type="range" id="cfg-gens" min="1" max="6" step="1" value="3">
             <div class="cfg-slider-val" id="cfg-gens-val">3</div>
           </div>
+          <div class="cfg-inline-help" data-i18n="generationsHelp">Each generation is a full round of evaluation, duels, elimination, crossover, and mutation.</div>
         </div>
       </div>
       <div>
         <div class="cfg-label">SELECT MODELS / FACTIONS <span style="color:var(--gold)">(min 2)</span></div>
         <div class="cfg-providers" id="cfg-providers"></div>
+      </div>
+      <div class="cfg-history">
+        <div class="cfg-label" data-i18n="recentRuns">RECENT RUNS</div>
+        <div class="cfg-history-list" id="cfg-history-list"></div>
       </div>
     </div>
     <div class="cfg-footer">
@@ -297,6 +681,24 @@ const ALL_PROVIDERS=[
   {id:'minimax',name:'Minimax',color:'#c084fc',models:['MiniMax-Text-01']}
 ];
 let selectedProviders=new Set(['openai','anthropic','gemini','deepseek','groq','zhipuai','siliconflow']);
+const DEFAULT_PROBLEM='Design a go-to-market and pricing strategy for an AI coding review tool targeting indie developers.';
+let currentProblem=DEFAULT_PROBLEM;
+let currentMode='fast';
+let currentBudget=0.5;
+let currentSearch=false;
+let currentApiCalls=0;
+let currentProgress=0;
+let currentStageLabel='Standby';
+let currentStatusText='Waiting for deployment.';
+let currentRunError='';
+let broadcastHeadline='Awaiting deployment.';
+let broadcastSubline='Once the run starts, this layer will call out major swings, generation summaries, and champion changes.';
+let broadcastSummary='Generation summaries, best fitness jumps, and elimination shocks will be summarized here.';
+let lastChampionKey='';
+const RUN_HISTORY_KEY='evohive-run-history';
+const BRIEFING_STATE_KEY='evohive-briefing-state';
+const BRIEFING_SIZE_KEY='evohive-briefing-size';
+const BRIEFING_SIZE_STEPS=[280,370,460,560];
 let FACTIONS=[];
 function buildFactions(){
   FACTIONS=ALL_PROVIDERS.filter(p=>selectedProviders.has(p.id)).map(p=>({id:p.id,name:p.name,color:p.color,soldiers:0}));
@@ -338,13 +740,209 @@ const I18N={
   evolutionComplete:{en:'EVOLUTION COMPLETE',zh:'进化完成'},
   vsBaseline:{en:'vs BASELINE',zh:'对决基线'},
   hint:{en:'Scroll to zoom · Drag to pan · Click agent for details',zh:'滚轮缩放 · 拖拽平移 · 点击查看详情'},
+  warDoctrine:{en:'WAR DOCTRINE',zh:'战争教义'},
+  doctrineTitle:{en:'Evolution rendered as a real-time battlefield',zh:'把进化过程渲染成实时战场'},
+  liveTelemetry:{en:'Live telemetry',zh:'实时遥测'},
+  backendDriven:{en:'Backend-driven combat',zh:'后端驱动战斗'},
+  doctrineCopy:{en:'Each solution is a soldier, each fitness score is battle power, and each evolutionary operator becomes a visible combat event.',zh:'每个方案都是士兵，每个适应度分数都是战斗力，每个进化算子都会变成可见的战场事件。'},
+  doctrineUnit:{en:'UNIT MODEL',zh:'单位模型'},
+  doctrineUnitValue:{en:'Solution = Soldier',zh:'方案 = 士兵'},
+  doctrinePower:{en:'POWER MODEL',zh:'战力模型'},
+  doctrinePowerValue:{en:'Fitness = Combat Power',zh:'适应度 = 战斗力'},
+  doctrineConflict:{en:'CONFLICT MODEL',zh:'冲突模型'},
+  doctrineConflictValue:{en:'Selection = Battlefield Survival',zh:'自然选择 = 战场生存'},
+  tierDoctrine:{en:'TIER DOCTRINE',zh:'Tier 升阶体系'},
+  tierDoctrineNote:{en:'Power escalates with Elo',zh:'Elo 越高，火力越强'},
+  tier1Name:{en:'Infantry',zh:'步兵'},
+  tier1Desc:{en:'Untested opener',zh:'初始方案，未经验证'},
+  tier2Name:{en:'Heavy',zh:'重甲兵'},
+  tier2Desc:{en:'Survives first review',zh:'通过首轮评估'},
+  tier3Name:{en:'Mech',zh:'机甲'},
+  tier3Desc:{en:'Laser and EMP pressure',zh:'激光与 EMP 压制'},
+  tier4Name:{en:'Tank',zh:'坦克'},
+  tier4Desc:{en:'Elite orbital force',zh:'精英轨道火力'},
+  tier5Name:{en:'Aircraft',zh:'飞行器'},
+  tier5Desc:{en:'Top-tier finisher',zh:'顶尖方案终结者'},
+  phaseLegendEval:{en:'Evaluate as scan',zh:'评估即扫描'},
+  phaseLegendEvalDesc:{en:'Assessment becomes shields, grade flashes, and power readouts over each unit.',zh:'评估会变成护盾、评分闪烁和单位头顶的战力读数。'},
+  phaseLegendElo:{en:'Elo as duel',zh:'Elo 即对战'},
+  phaseLegendEloDesc:{en:'Swiss rounds become face-to-face skirmishes with winner momentum and retreat arcs.',zh:'瑞士轮会变成面对面对抗，带胜者压制和败者撤退轨迹。'},
+  phaseLegendCross:{en:'Crossover as fusion',zh:'交叉即融合'},
+  phaseLegendCrossDesc:{en:'Parents fire linking beams and a child unit is forged at the center line.',zh:'父代之间会发射连接光束，在中线熔铸出子代单位。'},
+  phaseLegendMutate:{en:'Mutation as lightning',zh:'突变即闪电'},
+  phaseLegendMutateDesc:{en:'Random variation becomes chained electricity, shield spikes, and visible tier upgrades.',zh:'随机变异会变成链式电流、护盾尖峰和可见的升阶动画。'},
+  configSubtitle:{en:'Configure your evolution theater',zh:'配置你的进化战区'},
+  configBriefing:{en:'MISSION BRIEFING',zh:'任务简报'},
+  configBriefingCopy:{en:'This interface treats model evolution like an RTS campaign: providers become factions, solutions become troops, and every backend event becomes visible combat, fusion, mutation, or collapse.',zh:'这个界面把模型进化当成一场 RTS 战役来展示：Provider 变成阵营，方案变成部队，每个后端事件都会化成可见的战斗、融合、突变或崩溃。'},
+  configBriefA:{en:'FACTIONS',zh:'阵营'},
+  configBriefADesc:{en:'Different providers fight as colored armies so model performance reads like territorial control.',zh:'不同 Provider 会化成不同颜色军团，让模型表现变成直观的阵地对抗。'},
+  configBriefB:{en:'GENERATIONS',zh:'代际'},
+  configBriefBDesc:{en:'Each generation is a war round with evaluation, duels, elimination, crossover, and mutation.',zh:'每一代都是一轮战争，包含评估、对决、淘汰、交叉和突变。'},
+  configBriefC:{en:'TELEMETRY',zh:'遥测'},
+  configBriefCDesc:{en:'Frontend timing follows backend events, so faster APIs create faster combat pacing.',zh:'前端节奏跟随后端事件推进，API 越快，战斗节奏越快。'},
+  playbackLabel:{en:'PLAYBACK',zh:'演出速度'},
+  playbackNote:{en:'Animation speed only, not model speed',zh:'只影响前端动画，不影响模型计算'},
+  spectatorFeed:{en:'SPECTATOR FEED',zh:'观赛播报'},
+  liveUpdate:{en:'Live update',zh:'实时播报'},
+  watchNow:{en:'WATCH NOW',zh:'当前焦点'},
+  roundPulse:{en:'ROUND PULSE',zh:'代际脉冲'},
+  cameraPad:{en:'CAMERA',zh:'镜头'},
+  cameraGuide:{en:'Drag battlefield to pan, scroll to zoom',zh:'按住战场拖动平移，滚轮缩放'},
+  centerView:{en:'CENTER VIEW',zh:'居中视角'},
+  currentMission:{en:'CURRENT MISSION',zh:'当前任务'},
+  noMissionLoaded:{en:'No mission loaded yet. Configure a problem below and launch the war.',zh:'当前还没有任务。请先在下方输入问题，再启动进化战争。'},
+  problemInputLabel:{en:'MISSION / USER QUESTION',zh:'任务 / 用户问题'},
+  problemInputHelp:{en:'Describe the real problem EvoHive should solve. This prompt will be sent to the backend evolution engine.',zh:'输入 EvoHive 需要解决的真实问题。这个问题会直接发送给后端进化引擎。'},
+  charsCount:{en:'chars',zh:'字'},
+  problemReady:{en:'Ready for deployment',zh:'任务已就绪'},
+  problemTooShort:{en:'Please enter a mission first',zh:'请先输入问题'},
+  missionSent:{en:'Mission uploaded to backend',zh:'任务已发送到后端'},
+  modeLabel:{en:'MODE',zh:'模式'},
+  modeHelp:{en:'Fast is cheaper and shorter. Deep spends more time on post-evolution combat.',zh:'Fast 更省钱更快。Deep 会在后进化阶段投入更多计算。'},
+  agentsHelp:{en:'More agents increases diversity and cost. Use smaller populations for quick exploratory runs.',zh:'更多 agents 会提高多样性和成本。想快速试跑时建议用更小种群。'},
+  generationsHelp:{en:'Each generation is a full round of evaluation, duels, elimination, crossover, and mutation.',zh:'每一代都是一轮完整的评估、对战、淘汰、交叉和突变。'},
+  budgetLabel:{en:'BUDGET',zh:'预算'},
+  budgetHelp:{en:'Soft cap in USD for the backend evolution run.',zh:'后端进化运行的美元软上限。'},
+  searchLabel:{en:'SEARCH',zh:'搜索'},
+  searchToggle:{en:'Enable web search context',zh:'启用联网搜索上下文'},
+  searchHelp:{en:'Useful for market or current-event questions when search APIs are configured.',zh:'当搜索 API 已配置时，适合市场或时效性问题。'},
+  runProgress:{en:'RUN PROGRESS',zh:'运行进度'},
+  recentRuns:{en:'RECENT RUNS',zh:'最近运行'},
+  loadConfig:{en:'LOAD CONFIG',zh:'载入配置'},
+  runAgain:{en:'RUN AGAIN',zh:'再次运行'},
+  deleteRun:{en:'DELETE',zh:'删除'},
+  hideIntel:{en:'HIDE INTEL',zh:'收起情报栏'},
+  openIntel:{en:'OPEN INTEL',zh:'打开情报栏'},
+  briefingMinimized:{en:'Mission briefing minimized. Drag the header to move it.',zh:'任务简报已折叠。拖动顶部标题栏可以移动它。'},
+  makeSmaller:{en:'Shrink panel',zh:'缩小看板'},
+  makeLarger:{en:'Enlarge panel',zh:'放大看板'},
+  summaryDeck:{en:'DECISION DECK',zh:'决策摘要'},
+  keyTakeaway:{en:'KEY TAKEAWAY',zh:'核心结论'},
+  actionPlan:{en:'ACTION PLAN',zh:'行动清单'},
+  riskWatch:{en:'RISK WATCH',zh:'风险提醒'},
+  copyAnswer:{en:'COPY ANSWER',zh:'复制答案'},
+  runSummary:{en:'RUN SUMMARY',zh:'运行摘要'},
 };
 function t(key){return I18N[key]?.[lang]||key}
 function updateI18N(){
   document.querySelectorAll('[data-i18n]').forEach(el=>{
     el.textContent=t(el.dataset.i18n);
   });
+  const smallerBtn=document.getElementById('briefing-smaller');
+  const largerBtn=document.getElementById('briefing-larger');
+  if(smallerBtn) smallerBtn.setAttribute('aria-label',t('makeSmaller'));
+  if(largerBtn) largerBtn.setAttribute('aria-label',t('makeLarger'));
+  const miniText=document.getElementById('briefing-mini-text');
+  if(miniText) miniText.textContent=t('briefingMinimized');
+  const problemEl=document.getElementById('current-problem-text');
+  if(problemEl){
+    problemEl.textContent=currentProblem||t('noMissionLoaded');
+  }
+  const sidebarProblem=document.getElementById('sidebar-problem-text');
+  if(sidebarProblem){
+    sidebarProblem.textContent=currentProblem||t('noMissionLoaded');
+  }
+  const railProblem=document.getElementById('mission-rail-text');
+  if(railProblem){
+    railProblem.textContent=currentProblem||t('noMissionLoaded');
+  }
+  const bTitle=document.getElementById('broadcast-title');
+  const bSub=document.getElementById('broadcast-sub');
+  const bSummary=document.getElementById('broadcast-summary');
+  if(bTitle) bTitle.textContent=broadcastHeadline;
+  if(bSub) bSub.textContent=broadcastSubline;
+  if(bSummary) bSummary.textContent=broadcastSummary;
   localStorage.setItem('evohive-lang',lang);
+}
+function setCurrentProblem(problem){
+  currentProblem=(problem||'').trim()||DEFAULT_PROBLEM;
+  const problemEl=document.getElementById('current-problem-text');
+  if(problemEl) problemEl.textContent=currentProblem;
+  const sidebarProblem=document.getElementById('sidebar-problem-text');
+  if(sidebarProblem) sidebarProblem.textContent=currentProblem;
+  const railProblem=document.getElementById('mission-rail-text');
+  if(railProblem) railProblem.textContent=currentProblem;
+}
+function updateRuntimeStatus(){
+  const modeEl=document.getElementById('st-mode');
+  const budgetEl=document.getElementById('st-budget');
+  const searchEl=document.getElementById('st-search');
+  const apiEl=document.getElementById('st-api-calls');
+  const progressPctEl=document.getElementById('st-progress-pct');
+  const progressFillEl=document.getElementById('st-progress-fill');
+  const progressStageEl=document.getElementById('st-progress-stage');
+  const progressStatusEl=document.getElementById('st-progress-status');
+  if(modeEl) modeEl.textContent=String(currentMode||'fast').toUpperCase();
+  if(budgetEl) budgetEl.textContent=`$${Number(currentBudget||0).toFixed(1)}`;
+  if(searchEl) searchEl.textContent=currentSearch?'ON':'OFF';
+  if(apiEl) apiEl.textContent=String(currentApiCalls||0);
+  if(progressPctEl) progressPctEl.textContent=`${Math.max(0,Math.min(100,Math.round(currentProgress||0)))}%`;
+  if(progressFillEl) progressFillEl.style.width=`${Math.max(0,Math.min(100,currentProgress||0))}%`;
+  if(progressStageEl) progressStageEl.textContent=currentStageLabel||'Standby';
+  if(progressStatusEl) progressStatusEl.textContent=currentStatusText||'Waiting for deployment.';
+  const progressCard=document.querySelector('.progress-card');
+  if(progressCard) progressCard.classList.toggle('error',!!currentRunError);
+}
+function setProgress(progress, stageLabel, statusText){
+  if(progress!==undefined&&progress!==null) currentProgress=progress;
+  if(stageLabel) currentStageLabel=stageLabel;
+  if(statusText) currentStatusText=statusText;
+  updateRuntimeStatus();
+}
+function setRunError(message){
+  currentRunError=message||'';
+  if(currentRunError){
+    currentStageLabel=lang==='zh'?'运行失败':'Run Failed';
+    currentStatusText=currentRunError;
+  }
+  updateRuntimeStatus();
+}
+function loadRunHistory(){
+  try{
+    const raw=localStorage.getItem(RUN_HISTORY_KEY);
+    const parsed=raw?JSON.parse(raw):[];
+    return Array.isArray(parsed)?parsed:[];
+  }catch(e){
+    return [];
+  }
+}
+function saveRunHistoryEntry(entry){
+  const history=loadRunHistory();
+  history.unshift(entry);
+  try{
+    localStorage.setItem(RUN_HISTORY_KEY,JSON.stringify(history.slice(0,12)));
+  }catch(e){}
+}
+function deleteRunHistoryEntry(idx){
+  const history=loadRunHistory();
+  if(idx<0||idx>=history.length) return;
+  history.splice(idx,1);
+  try{
+    localStorage.setItem(RUN_HISTORY_KEY,JSON.stringify(history));
+  }catch(e){}
+}
+function renderRunHistory(){
+  const el=document.getElementById('cfg-history-list');
+  if(!el) return;
+  const history=loadRunHistory();
+  if(!history.length){
+    el.innerHTML=`<div class="cfg-history-empty">${lang==='zh'?'还没有运行记录。完成一次任务后，这里会显示最近的 EvoHive runs。':'No runs yet. Complete a task and your recent EvoHive runs will appear here.'}</div>`;
+    return;
+  }
+  el.innerHTML=history.map((run,idx)=>`
+    <div class="cfg-history-item" data-history-idx="${idx}">
+      <div class="cfg-history-top">
+        <div class="cfg-history-name">${(run.mode||'fast').toUpperCase()} · ${run.status||'complete'}</div>
+        <div class="cfg-history-meta">$${Number(run.cost||0).toFixed(2)} · ${run.time||''}</div>
+      </div>
+      <div class="cfg-history-problem">${run.problem||''}</div>
+      <div class="cfg-history-actions">
+        <button class="cfg-history-btn" data-history-action="load" data-history-idx="${idx}">${t('loadConfig')}</button>
+        <button class="cfg-history-btn" data-history-action="rerun" data-history-idx="${idx}">${t('runAgain')}</button>
+        <button class="cfg-history-btn danger" data-history-action="delete" data-history-idx="${idx}">${t('deleteRun')}</button>
+      </div>
+    </div>
+  `).join('');
 }
 
 /* ---------- SECTION: CANVAS & RESIZE ---------- */
@@ -797,6 +1395,12 @@ function clampPan(){
 }
 // Mouse drag pan
 let wasDragged=false;
+cvCam.addEventListener('mouseenter',()=>{
+  if(!dragging) cvCam.style.cursor='grab';
+});
+cvCam.addEventListener('mouseleave',()=>{
+  if(!dragging) cvCam.style.cursor='default';
+});
 cvCam.addEventListener('mousedown',e=>{
   dragging=true;wasDragged=false;dragStartX=e.clientX;dragStartY=e.clientY;
   dragCamX=camTargetX;dragCamY=camTargetY;
@@ -811,7 +1415,7 @@ window.addEventListener('mousemove',e=>{
   clampPan();
 });
 window.addEventListener('mouseup',()=>{
-  dragging=false;cvCam.style.cursor='default';
+  dragging=false;cvCam.style.cursor='grab';
 });
 // Touch support
 let touchStartDist=0,touchStartZoom=1;
@@ -1049,6 +1653,8 @@ function updateSidebar(){
 }
 function _updateSidebarNow(){
   const alive=aliveAgents();
+  updateRuntimeStatus();
+  updateChampionBroadcast();
   document.getElementById('st-alive').textContent=alive.length;
   document.getElementById('st-gen').textContent=currentGen;
   document.getElementById('st-kills').textContent=totalKills;
@@ -2141,15 +2747,108 @@ function render(){
 }
 render();
 
+function nudgeCamera(dx,dy){
+  camTargetX+=dx;
+  camTargetY+=dy;
+  clampPan();
+}
+
+function setBroadcast(headline,subline,summary,tag){
+  if(headline) broadcastHeadline=headline;
+  if(subline) broadcastSubline=subline;
+  if(summary) broadcastSummary=summary;
+  const titleEl=document.getElementById('broadcast-title');
+  const subEl=document.getElementById('broadcast-sub');
+  const sumEl=document.getElementById('broadcast-summary');
+  const tagEl=document.getElementById('broadcast-tag');
+  if(titleEl) titleEl.textContent=broadcastHeadline;
+  if(subEl) subEl.textContent=broadcastSubline;
+  if(sumEl) sumEl.textContent=broadcastSummary;
+  if(tagEl) tagEl.textContent=tag||t('liveUpdate');
+}
+
+function updateChampionBroadcast(){
+  const champ=aliveAgents().sort((a,b)=>b.elo-a.elo)[0];
+  const champEl=document.getElementById('broadcast-champion');
+  const metaEl=document.getElementById('broadcast-meta');
+  if(!champ){
+    if(champEl) champEl.textContent=lang==='zh'?'当前还没有冠军单位。':'No champion unit yet.';
+    if(metaEl) metaEl.textContent=lang==='zh'?'系统会在关键阶段自动切换焦点。':'The feed will switch focus automatically during key phases.';
+    return;
+  }
+  const champKey=`${champ.factionName}#${champ.id}`;
+  if(champKey!==lastChampionKey && lastChampionKey){
+    setBroadcast(
+      lang==='zh'?`${champ.factionName} 接管榜首`:`${champ.factionName} takes the lead`,
+      lang==='zh'?`${champ.factionName} #${champ.id} 现在是当前冠军。`:`${champ.factionName} #${champ.id} is now the live champion.`,
+      lang==='zh'?'榜首发生变化，观众可以关注冠军是否能守住优势。':'Lead change detected. Watch whether the new champion can hold momentum.',
+      lang==='zh'?'冠军更替':'Champion shift'
+    );
+  }
+  lastChampionKey=champKey;
+  if(champEl) champEl.textContent=`${champ.factionName} #${champ.id} · T${getTier(champ)} · ELO ${Math.round(champ.elo||0)}`;
+  if(metaEl) metaEl.textContent=lang==='zh'
+    ? `GEN ${champ.gen||currentGen} · ${champ.kills||0} 击杀 · HP ${Math.round(champ.hp||100)}%`
+    : `GEN ${champ.gen||currentGen} · ${champ.kills||0} kills · HP ${Math.round(champ.hp||100)}%`;
+}
+
+let toastTimer=null;
+function showToast(message){
+  const el=document.getElementById('ui-toast');
+  if(!el||!message) return;
+  el.textContent=message;
+  el.classList.add('show');
+  if(toastTimer) clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>el.classList.remove('show'),1800);
+}
+
+function copyCurrentAnswer(){
+  const text=(lastWarResults&&lastWarResults.evolved_answer)||'';
+  if(navigator.clipboard&&text){
+    navigator.clipboard.writeText(text);
+    showToast(lang==='zh'?'最终答案已复制':'Final answer copied');
+  }
+}
+
+function extractAnswerDeck(text){
+  const clean=(text||'').replace(/\r/g,'').trim();
+  if(!clean){
+    return {
+      takeaway:'',
+      actions:[],
+      risks:[]
+    };
+  }
+  const paragraphs=clean.split(/\n\s*\n/).map(s=>s.trim()).filter(Boolean);
+  const lines=clean.split('\n').map(s=>s.replace(/^[-*•\d\.\)\s]+/,'').trim()).filter(Boolean);
+  const takeaway=(paragraphs[0]||lines[0]||'').slice(0,240);
+  const actions=lines.filter(line=>/plan|step|launch|build|ship|test|price|go-to-market|执行|行动|步骤|落地|上线|验证|定价/.test(line.toLowerCase())).slice(0,4);
+  const risks=lines.filter(line=>/risk|watch|warning|budget|latency|failure|trade-off|limitation|风险|注意|预算|失败|限制|取舍/.test(line.toLowerCase())).slice(0,3);
+  return {
+    takeaway,
+    actions:actions.length?actions:lines.slice(1,5),
+    risks:risks.length?risks:lines.slice(5,8)
+  };
+}
+
 /* ---------- SECTION: RESULTS SCREEN ---------- */
 function showResults(){
   const el=document.getElementById('results');
   const content=document.getElementById('res-content');
+  const results=lastWarResults||{};
   const champion=aliveAgents().sort((a,b)=>b.elo-a.elo)[0];
   const alive=aliveAgents();
   const duration=((Date.now()-warStartTime)/1000).toFixed(0);
   const mins=(duration/60)|0;
   const secs=duration%60;
+  const apiCalls=results.total_api_calls||currentApiCalls||agents.length*3;
+  const estCost=Number(results.estimated_cost??(agents.length*0.012));
+  const missionText=results.problem||currentProblem;
+  const top5Results=Array.isArray(results.top5)&&results.top5.length?results.top5:null;
+  const evolvedAnswer=(results.evolved_answer||'').trim();
+  const gensData=Array.isArray(results.generations_data)?results.generations_data:[];
+  const recentLog=battlelog.slice(0,12);
+  const hasError=!!currentRunError;
   // faction breakdown
   let factionHtml='';
   for(const f of FACTIONS){
@@ -2166,29 +2865,112 @@ function showResults(){
   }
   // top 5
   let topHtml='';
-  const top5=alive.sort((a,b)=>b.elo-a.elo).slice(0,5);
+  const top5=top5Results||alive.sort((a,b)=>b.elo-a.elo).slice(0,5);
   const medals=['🥇','🥈','🥉','④','⑤'];
   top5.forEach((a,i)=>{
+    const color=a.color||a.provider&&ALL_PROVIDERS.find(p=>p.id===a.provider)?.color||'#c8e6c8';
+    const name=a.factionName||a.provider||'Unknown';
+    const tierVal=typeof a.elo==='number'?getTier(a):(a.gen>=3?4:1);
     topHtml+=`<div class="res-rank-row">
       <div class="res-rank-num">${medals[i]}</div>
-      <div class="faction-dot" style="background:${a.color}"></div>
-      <span style="color:${a.color};flex:1">${a.factionName}#${a.id}</span>
-      <span>T${getTier(a)}</span>
-      <span style="margin-left:8px">ELO ${Math.round(a.elo)}</span>
+      <div class="faction-dot" style="background:${color}"></div>
+      <span style="color:${color};flex:1">${name}#${a.id}</span>
+      <span>T${tierVal}</span>
+      <span style="margin-left:8px">ELO ${Math.round(a.elo||0)}</span>
     </div>`;
   });
+  let generationHtml='';
+  if(gensData.length){
+    generationHtml=gensData.map(gd=>{
+      const best=Math.max(0,Math.min(1,Number(gd.best_fitness||0)));
+      return `<div class="res-timeline-row">
+        <div class="res-timeline-gen">G${gd.generation}</div>
+        <div class="res-timeline-bar"><div class="res-timeline-fill" style="width:${(best*100).toFixed(0)}%"></div></div>
+        <div class="res-timeline-meta">${Number(gd.best_fitness||0).toFixed(2)}</div>
+      </div>`;
+    }).join('');
+  } else {
+    generationHtml=`<div class="res-summary-text">${lang==='zh'?'当前没有代际统计数据。':'No generation telemetry available for this run.'}</div>`;
+  }
+  const answerDeck=extractAnswerDeck(evolvedAnswer);
+  const actionsHtml=answerDeck.actions.length
+    ? answerDeck.actions.map(item=>`<div class="res-log-entry">${item}</div>`).join('')
+    : `<div class="res-summary-text">${lang==='zh'?'当前没有提取到明确行动项。':'No concrete action items were extracted from this run.'}</div>`;
+  const risksHtml=answerDeck.risks.length
+    ? answerDeck.risks.map(item=>`<div class="res-log-entry">${item}</div>`).join('')
+    : `<div class="res-summary-text">${lang==='zh'?'当前没有提取到显著风险提醒。':'No major risk notes were extracted from this run.'}</div>`;
+  let recentLogHtml='';
+  if(recentLog.length){
+    recentLogHtml=recentLog.map(entry=>`<div class="res-log-entry">[${entry.time}] ${entry.msg}</div>`).join('');
+  } else {
+    recentLogHtml=`<div class="res-summary-text">${lang==='zh'?'当前没有可展示的运行日志。':'No run log entries available yet.'}</div>`;
+  }
 
   content.innerHTML=`
-    <div class="res-crown">👑</div>
-    <div class="res-champ">${champion?champion.factionName+' #'+champion.id:'—'}</div>
-    <div class="res-champ-sub">ELO ${champion?Math.round(champion.elo):0} | T${champion?getTier(champion):0} | GEN ${champion?champion.gen:0}</div>
+    <div class="res-hero">
+      <div class="res-crown">👑</div>
+      <div class="res-champ">${champion?champion.factionName+' #'+champion.id:'—'}</div>
+      <div class="res-champ-sub">ELO ${champion?Math.round(champion.elo):0} | T${champion?getTier(champion):0} | GEN ${champion?champion.gen:0}</div>
+      <div class="res-pill-row">
+        <div class="res-pill">${String(currentMode||'fast').toUpperCase()}</div>
+        <div class="res-pill">$${Number(currentBudget||0).toFixed(1)} budget</div>
+        <div class="res-pill">${currentSearch?'Search ON':'Search OFF'}</div>
+        <div class="res-pill">${selectedProviders.size} factions</div>
+      </div>
+      <div class="res-mission">
+        <strong>${t('currentMission')}</strong>
+        ${missionText}
+      </div>
+    </div>
     <div class="res-grid">
       <div class="res-card"><div class="res-card-val">${mins}:${String(secs).padStart(2,'0')}</div><div class="res-card-lbl">${t('duration')}</div></div>
       <div class="res-card"><div class="res-card-val">${totalKills}</div><div class="res-card-lbl">${t('totalKills')}</div></div>
       <div class="res-card"><div class="res-card-val">${alive.length}</div><div class="res-card-lbl">${t('survivors')}</div></div>
       <div class="res-card"><div class="res-card-val">${GENS}</div><div class="res-card-lbl">${t('generations')}</div></div>
-      <div class="res-card"><div class="res-card-val">${agents.length*3}</div><div class="res-card-lbl">${t('apiCalls')}</div></div>
-      <div class="res-card"><div class="res-card-val">$${(agents.length*0.012).toFixed(2)}</div><div class="res-card-lbl">${t('cost')}</div></div>
+      <div class="res-card"><div class="res-card-val">${apiCalls}</div><div class="res-card-lbl">${t('apiCalls')}</div></div>
+      <div class="res-card"><div class="res-card-val">$${estCost.toFixed(2)}</div><div class="res-card-lbl">${t('cost')}</div></div>
+    </div>
+    <div class="res-summary-grid">
+      <div class="res-summary-card">
+        <div class="res-section-title">${t('summaryDeck')}</div>
+        <div class="res-list">
+          <div class="res-list-row"><span>${t('keyTakeaway')}</span><span>${answerDeck.takeaway||'—'}</span></div>
+          <div class="res-list-row"><span>${t('runSummary')}</span><span>${results.event_count||wsEventLog.length||0} events / ${GENS} gens</span></div>
+          <div class="res-list-row"><span>${t('budgetLabel')}</span><span>$${Number(currentBudget||0).toFixed(1)}</span></div>
+          <div class="res-list-row"><span>${t('apiCalls')}</span><span>${apiCalls}</span></div>
+        </div>
+      </div>
+      <div class="res-summary-card ${hasError?'error':''}">
+        <div class="res-section-title">${t('evolvedAnswer')}</div>
+        <div class="res-summary-text">${hasError?(lang==='zh'?`这次运行未成功完成。<br><br>${currentRunError}<br><br>建议检查模型可用性、预算设置、WebSocket 连接和后端日志。`:`This run did not complete successfully.<br><br>${currentRunError}<br><br>Check model availability, budget settings, WebSocket connectivity, and backend logs.`):evolvedAnswer?evolvedAnswer.replace(/\n/g,'<br>'):(lang==='zh'?'当前运行还没有返回最终正文答案。':'No final long-form answer was returned for this run yet.')}</div>
+      </div>
+      <div class="res-summary-card">
+        <div class="res-section-title">Run Snapshot</div>
+        <div class="res-list">
+          <div class="res-list-row"><span>Population</span><span>${TOTAL}</span></div>
+          <div class="res-list-row"><span>Providers</span><span>${[...selectedProviders].length}</span></div>
+          <div class="res-list-row"><span>Events</span><span>${results.event_count||wsEventLog.length||0}</span></div>
+          <div class="res-list-row"><span>Champion Tier</span><span>T${champion?getTier(champion):0}</span></div>
+          <div class="res-list-row"><span>Mode</span><span>${String(currentMode||'fast').toUpperCase()}</span></div>
+          <div class="res-list-row"><span>Search</span><span>${currentSearch?'ON':'OFF'}</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="res-summary-grid">
+      <div class="res-summary-card">
+        <div class="res-section-title">${lang==='zh'?'代际时间线':'Generation Timeline'}</div>
+        <div class="res-timeline">${generationHtml}</div>
+      </div>
+      <div class="res-summary-card">
+        <div class="res-section-title">${lang==='zh'?'配置摘要':'Config Summary'}</div>
+        <div class="res-list">
+          <div class="res-list-row"><span>${t('modeLabel')}</span><span>${String(currentMode||'fast').toUpperCase()}</span></div>
+          <div class="res-list-row"><span>${t('budgetLabel')}</span><span>$${Number(currentBudget||0).toFixed(1)}</span></div>
+          <div class="res-list-row"><span>${t('searchLabel')}</span><span>${currentSearch?'ON':'OFF'}</span></div>
+          <div class="res-list-row"><span>${t('generations')}</span><span>${GENS}</span></div>
+          <div class="res-list-row"><span>Playback</span><span>${simSpeed}x</span></div>
+        </div>
+      </div>
     </div>
     <div class="res-section">
       <div class="res-section-title">${t('factionBreakdown')}</div>
@@ -2201,20 +2983,36 @@ function showResults(){
     <div class="res-section">
       <div class="res-section-title">${t('evolvedAnswer')}</div>
       <div id="res-answer">
-        ${champion?`<strong>${champion.factionName} #${champion.id}</strong> (T${getTier(champion)})<br>
+        ${evolvedAnswer?evolvedAnswer.replace(/\n/g,'<br>'):champion?`<strong>${champion.factionName} #${champion.id}</strong> (T${getTier(champion)})<br>
         Feasibility: ${champion.fitness.feasibility.toFixed(1)} | Innovation: ${champion.fitness.innovation.toFixed(1)}<br>
         Specificity: ${champion.fitness.specificity.toFixed(1)} | Cost Efficiency: ${champion.fitness.cost.toFixed(1)}<br>
         Mutated: ${champion.mutated?'Yes':'No'} | Parents: ${champion.parents||'Original'}<br><br>
         <em>${lang==='zh'?'在实际运行中，此处将展示由 EvoHive 进化引擎生成的最优方案。':'In production, this displays the optimal solution generated by the EvoHive evolution engine.'}</em>`:'No champion survived.'}
       </div>
+      <button class="res-action-btn" style="margin-top:12px" onclick="copyCurrentAnswer()">${t('copyAnswer')}</button>
     </div>
-    <button id="restart-btn" onclick="document.getElementById('results').style.display='none';restartWar()">${t('restart')}</button>
+    <div class="res-summary-grid">
+      <div class="res-summary-card">
+        <div class="res-section-title">${t('actionPlan')}</div>
+        <div class="res-log">${actionsHtml}</div>
+      </div>
+      <div class="res-summary-card">
+        <div class="res-section-title">${t('riskWatch')}</div>
+        <div class="res-log">${risksHtml}</div>
+      </div>
+    </div>
+    <div class="res-section">
+      <div class="res-section-title">${lang==='zh'?'最近运行日志':'Recent Run Log'}</div>
+      <div class="res-log">${recentLogHtml}</div>
+    </div>
+    <button class="res-action-btn" onclick="document.getElementById('results').style.display='none';restartWar()">${t('restart')}</button>
   `;
   el.style.display='block';
 }
 function restartWar(){
   agents=[];particles=[];floatTexts=[];killfeed=[];battlelog=[];
   totalKills=0;currentPhase=0;currentGen=1;
+  currentApiCalls=0;currentProgress=0;currentStageLabel='Standby';currentStatusText='Waiting for deployment.';currentRunError='';
   stormZone.radius=COLS/2+2;stormZone.targetRadius=5;
   redMonsters=[];meteors=[];scanTarget=null;forgeActive=false;
   selectedAgent=null;
@@ -2258,6 +3056,10 @@ window.addEventListener('keydown',e=>{
   if(e.key==='2'){simSpeed=2;document.querySelectorAll('.speed-btn').forEach((b,i)=>b.classList.toggle('active',i===1));}
   if(e.key==='3'){simSpeed=4;document.querySelectorAll('.speed-btn').forEach((b,i)=>b.classList.toggle('active',i===2));}
   if(e.key==='r'||e.key==='R'){camTargetX=0;camTargetY=0;camTargetZoom=1;}
+  if(e.key==='w'||e.key==='W'||e.key==='ArrowUp'){e.preventDefault();nudgeCamera(0,72);}
+  if(e.key==='s'||e.key==='S'||e.key==='ArrowDown'){e.preventDefault();nudgeCamera(0,-72);}
+  if(e.key==='a'||e.key==='A'||e.key==='ArrowLeft'){e.preventDefault();nudgeCamera(72,0);}
+  if(e.key==='d'||e.key==='D'||e.key==='ArrowRight'){e.preventDefault();nudgeCamera(-72,0);}
   if(e.key==='Escape'){
     const detail=document.getElementById('agent-detail');
     if(detail.style.display==='block'){detail.style.display='none';selectedAgent=null;}
@@ -2305,13 +3107,57 @@ document.getElementById('cfg-providers').addEventListener('keydown',e=>{
     renderConfigProviders();
   }
 });
+document.getElementById('cfg-history-list').addEventListener('click',e=>{
+  const actionBtn=e.target.closest('[data-history-action]');
+  const item=e.target.closest('.cfg-history-item');
+  if(!item) return;
+  const idx=Number((actionBtn?.dataset.historyIdx)||item.dataset.historyIdx||-1);
+  const history=loadRunHistory();
+  const run=history[idx];
+  if(actionBtn?.dataset.historyAction==='delete'){
+    deleteRunHistoryEntry(idx);
+    renderRunHistory();
+    return;
+  }
+  if(!run) return;
+  if(run.problem) document.getElementById('cfg-problem').value=run.problem;
+  if(run.mode) document.getElementById('cfg-mode').value=run.mode;
+  if(run.budget!==undefined) document.getElementById('cfg-budget').value=run.budget;
+  if(run.total) document.getElementById('cfg-agents').value=run.total;
+  if(run.gens) document.getElementById('cfg-gens').value=run.gens;
+  document.getElementById('cfg-agents-val').textContent=document.getElementById('cfg-agents').value;
+  document.getElementById('cfg-gens-val').textContent=document.getElementById('cfg-gens').value;
+  document.getElementById('cfg-search').checked=!!run.enableSearch;
+  if(Array.isArray(run.providers)&&run.providers.length>=2) selectedProviders=new Set(run.providers);
+  setCurrentProblem(run.problem||DEFAULT_PROBLEM);
+  renderConfigProviders();
+  updateConfigSummary();
+  if(actionBtn?.dataset.historyAction==='rerun'){
+    document.getElementById('start-war-btn').click();
+  }
+});
 function updateConfigSummary(){
   const cnt=selectedProviders.size;
+  const problem=(document.getElementById('cfg-problem')?.value||'').trim();
+  const problemReady=problem.length>0;
   document.getElementById('cfg-sel-count').textContent=cnt;
   document.getElementById('cfg-sel-agents').textContent=document.getElementById('cfg-agents').value;
-  document.getElementById('start-war-btn').disabled=cnt<2;
+  document.getElementById('cfg-problem-count').textContent=problem.length;
+  document.getElementById('start-war-btn').disabled=cnt<2||!problemReady;
   const errEl=document.getElementById('cfg-error');
-  if(errEl) errEl.style.display=cnt<2?'block':'none';
+  if(errEl){
+    if(cnt<2){
+      errEl.textContent='Select at least 2 factions to start';
+      errEl.style.display='block';
+    }else if(!problemReady){
+      errEl.textContent=t('problemTooShort');
+      errEl.style.display='block';
+    }else{
+      errEl.style.display='none';
+    }
+  }
+  const problemStatus=document.getElementById('cfg-problem-status');
+  if(problemStatus) problemStatus.textContent=problemReady?t('problemReady'):t('problemTooShort');
 }
 // Slider events
 document.getElementById('cfg-agents').addEventListener('input',e=>{
@@ -2321,14 +3167,197 @@ document.getElementById('cfg-agents').addEventListener('input',e=>{
 document.getElementById('cfg-gens').addEventListener('input',e=>{
   document.getElementById('cfg-gens-val').textContent=e.target.value;
 });
+document.getElementById('cfg-problem').addEventListener('input',()=>{
+  updateConfigSummary();
+});
+const briefingPanel=document.getElementById('briefing-panel');
+const briefingHead=document.querySelector('.briefing-head');
+const briefingToggle=document.getElementById('briefing-toggle');
+const briefingSmaller=document.getElementById('briefing-smaller');
+const briefingLarger=document.getElementById('briefing-larger');
+const briefingResize=document.getElementById('briefing-resize');
+const cameraFocusBtn=document.getElementById('camera-focus-btn');
+const sidebarEl=document.getElementById('sidebar');
+const sidebarToggle=document.getElementById('sidebar-toggle');
+const sidebarPeek=document.getElementById('sidebar-peek');
+let briefingWidth=370;
+function applyBriefingWidth(){
+  if(!briefingPanel) return;
+  const isMobile=window.innerWidth<=768;
+  if(isMobile){
+    briefingPanel.style.width='auto';
+    return;
+  }
+  const width=briefingPanel.classList.contains('minimized')
+    ? Math.max(240,Math.round(briefingWidth*0.68))
+    : briefingWidth;
+  const maxWidth=Math.max(260,window.innerWidth-36);
+  briefingPanel.style.width=`${Math.min(width,maxWidth)}px`;
+}
+function setBriefingMinimized(minimized){
+  if(!briefingPanel||!briefingToggle) return;
+  briefingPanel.classList.toggle('minimized',!!minimized);
+  briefingToggle.textContent=minimized?'+':'-';
+  briefingToggle.setAttribute('aria-label',minimized?'Expand briefing':'Collapse briefing');
+  try{localStorage.setItem(BRIEFING_STATE_KEY,minimized?'minimized':'expanded');}catch(e){}
+  applyBriefingWidth();
+}
+function setSidebarCollapsed(collapsed){
+  if(!sidebarEl) return;
+  const isMobile=window.innerWidth<=768;
+  if(isMobile) return;
+  sidebarEl.classList.toggle('collapsed',!!collapsed);
+  if(sidebarPeek) sidebarPeek.style.display=collapsed?'block':'none';
+  showToast(collapsed?(lang==='zh'?'情报栏已收起':'Intel sidebar hidden'):(lang==='zh'?'情报栏已展开':'Intel sidebar opened'));
+}
+function setBriefingWidth(nextWidth){
+  briefingWidth=BRIEFING_SIZE_STEPS.reduce((closest,size)=>{
+    return Math.abs(size-nextWidth)<Math.abs(closest-nextWidth)?size:closest;
+  },BRIEFING_SIZE_STEPS[1]);
+  applyBriefingWidth();
+  try{localStorage.setItem(BRIEFING_SIZE_KEY,String(briefingWidth));}catch(e){}
+}
+function stepBriefingWidth(direction){
+  const currentIdx=Math.max(0,BRIEFING_SIZE_STEPS.findIndex(size=>size===briefingWidth));
+  const nextIdx=Math.min(BRIEFING_SIZE_STEPS.length-1,Math.max(0,currentIdx+direction));
+  setBriefingWidth(BRIEFING_SIZE_STEPS[nextIdx]);
+}
+try{
+  const savedBriefingState=localStorage.getItem(BRIEFING_STATE_KEY);
+  if(savedBriefingState==='minimized') setBriefingMinimized(true);
+}catch(e){}
+try{
+  const savedBriefingSize=Number(localStorage.getItem(BRIEFING_SIZE_KEY));
+  if(savedBriefingSize) setBriefingWidth(savedBriefingSize);
+  else applyBriefingWidth();
+}catch(e){
+  applyBriefingWidth();
+}
+if(briefingToggle){
+  briefingToggle.addEventListener('click',e=>{
+    e.stopPropagation();
+    setBriefingMinimized(!briefingPanel.classList.contains('minimized'));
+    showToast(briefingPanel.classList.contains('minimized')?(lang==='zh'?'任务简报已折叠':'Mission briefing collapsed'):(lang==='zh'?'任务简报已展开':'Mission briefing expanded'));
+  });
+}
+if(briefingSmaller){
+  briefingSmaller.addEventListener('click',e=>{
+    e.stopPropagation();
+    stepBriefingWidth(-1);
+  });
+}
+if(briefingLarger){
+  briefingLarger.addEventListener('click',e=>{
+    e.stopPropagation();
+    stepBriefingWidth(1);
+  });
+}
+if(briefingHead&&briefingPanel){
+  let dragState=null;
+  const stopBriefingDrag=()=>{
+    if(!dragState) return;
+    dragState=null;
+    briefingHead.style.cursor='grab';
+    window.removeEventListener('mousemove',onBriefingDrag);
+    window.removeEventListener('mouseup',stopBriefingDrag);
+  };
+  const onBriefingDrag=e=>{
+    if(!dragState) return;
+    const maxLeft=Math.max(12,window.innerWidth-briefingPanel.offsetWidth-12);
+    const maxTop=Math.max(12,window.innerHeight-briefingPanel.offsetHeight-12);
+    const left=Math.min(maxLeft,Math.max(12,e.clientX-dragState.offsetX));
+    const top=Math.min(maxTop,Math.max(12,e.clientY-dragState.offsetY));
+    briefingPanel.style.left=`${left}px`;
+    briefingPanel.style.top=`${top}px`;
+    briefingPanel.style.right='auto';
+  };
+  briefingHead.addEventListener('mousedown',e=>{
+    if(e.target.closest('#briefing-toggle')||e.target.closest('#briefing-smaller')||e.target.closest('#briefing-larger')) return;
+    dragState={
+      offsetX:e.clientX-briefingPanel.offsetLeft,
+      offsetY:e.clientY-briefingPanel.offsetTop,
+    };
+    briefingHead.style.cursor='grabbing';
+    window.addEventListener('mousemove',onBriefingDrag);
+    window.addEventListener('mouseup',stopBriefingDrag);
+  });
+}
+if(briefingResize&&briefingPanel){
+  let resizeState=null;
+  const stopBriefingResize=()=>{
+    if(!resizeState) return;
+    resizeState=null;
+    window.removeEventListener('mousemove',onBriefingResize);
+    window.removeEventListener('mouseup',stopBriefingResize);
+  };
+  const onBriefingResize=e=>{
+    if(!resizeState) return;
+    const maxWidth=Math.max(280,window.innerWidth-briefingPanel.offsetLeft-20);
+    const nextWidth=Math.min(maxWidth,Math.max(280,resizeState.startWidth+(e.clientX-resizeState.startX)));
+    briefingWidth=nextWidth;
+    applyBriefingWidth();
+    try{localStorage.setItem(BRIEFING_SIZE_KEY,String(briefingWidth));}catch(e){}
+  };
+  briefingResize.addEventListener('mousedown',e=>{
+    e.preventDefault();
+    e.stopPropagation();
+    resizeState={
+      startX:e.clientX,
+      startWidth:briefingPanel.offsetWidth,
+    };
+    window.addEventListener('mousemove',onBriefingResize);
+    window.addEventListener('mouseup',stopBriefingResize);
+  });
+}
+window.addEventListener('resize',applyBriefingWidth);
+document.querySelectorAll('[data-cam-move]').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    const move=btn.dataset.camMove;
+    const step=72;
+    if(move==='up') nudgeCamera(0,step);
+    if(move==='down') nudgeCamera(0,-step);
+    if(move==='left') nudgeCamera(step,0);
+    if(move==='right') nudgeCamera(-step,0);
+  });
+});
+if(cameraFocusBtn){
+  cameraFocusBtn.addEventListener('click',()=>{
+    camTargetX=0;camTargetY=0;camTargetZoom=1;
+    showToast(lang==='zh'?'视角已回到中心':'Camera centered');
+  });
+}
+if(sidebarToggle){
+  sidebarToggle.addEventListener('click',()=>{
+    setSidebarCollapsed(!sidebarEl.classList.contains('collapsed'));
+  });
+}
+if(sidebarPeek){
+  sidebarPeek.addEventListener('click',()=>{
+    setSidebarCollapsed(false);
+  });
+}
 // Start button
 document.getElementById('start-war-btn').addEventListener('click',()=>{
-  if(selectedProviders.size<2) return;
+  const problem=(document.getElementById('cfg-problem').value||'').trim();
+  const mode=document.getElementById('cfg-mode').value||'fast';
+  const budget=Math.max(0.1,Number(document.getElementById('cfg-budget').value||0.5));
+  const enableSearch=!!document.getElementById('cfg-search').checked;
+  if(selectedProviders.size<2||!problem) return;
   TOTAL=parseInt(document.getElementById('cfg-agents').value);
   GENS=parseInt(document.getElementById('cfg-gens').value);
   soldierScale=Math.max(.45,100/TOTAL);
+  setCurrentProblem(problem);
+  currentMode=mode;
+  currentBudget=budget;
+  currentSearch=enableSearch;
+  currentApiCalls=0;
+  currentProgress=1;
+  currentStageLabel=lang==='zh'?'部署中':'Deploying';
+  currentStatusText=lang==='zh'?'正在准备战场与后端任务...':'Preparing battlefield and backend mission...';
+  currentRunError='';
+  updateRuntimeStatus();
   // persist config
-  try{localStorage.setItem('evohive-cfg',JSON.stringify({total:TOTAL,gens:GENS,providers:[...selectedProviders]}));}catch(e){}
+  try{localStorage.setItem('evohive-cfg',JSON.stringify({total:TOTAL,gens:GENS,providers:[...selectedProviders],problem,mode,budget,enableSearch}));}catch(e){}
   buildFactions();
   document.getElementById('config-modal').style.display='none';
   if(wsLiveMode&&wsConn&&wsConn.readyState===WebSocket.OPEN){
@@ -2344,9 +3373,13 @@ document.getElementById('start-war-btn').addEventListener('click',()=>{
         providers:[...selectedProviders],
         total:TOTAL,
         gens:GENS,
+        problem,
+        mode,
+        budget,
+        enable_search:enableSearch,
       }
     }));
-    addBattleLog('Sent war config to backend (backend-driven mode)');
+    addBattleLog(`${t('missionSent')}: ${problem.slice(0,80)}${problem.length>80?'...':''}`);
   } else {
     // STANDALONE MODE: run local simulation
     backendDriven=false;
@@ -2360,9 +3393,20 @@ try{
     if(saved.total){document.getElementById('cfg-agents').value=saved.total;document.getElementById('cfg-agents-val').textContent=saved.total;}
     if(saved.gens){document.getElementById('cfg-gens').value=saved.gens;document.getElementById('cfg-gens-val').textContent=saved.gens;}
     if(saved.providers&&saved.providers.length>=2){selectedProviders=new Set(saved.providers);}
+    if(saved.problem){document.getElementById('cfg-problem').value=saved.problem;setCurrentProblem(saved.problem);}
+    if(saved.mode){document.getElementById('cfg-mode').value=saved.mode;currentMode=saved.mode;}
+    if(saved.budget){document.getElementById('cfg-budget').value=saved.budget;currentBudget=Number(saved.budget);}
+    if(saved.enableSearch){document.getElementById('cfg-search').checked=!!saved.enableSearch;currentSearch=!!saved.enableSearch;}
   }
 }catch(e){}
+if(!document.getElementById('cfg-problem').value){
+  document.getElementById('cfg-problem').value=DEFAULT_PROBLEM;
+}
+setCurrentProblem(document.getElementById('cfg-problem').value||DEFAULT_PROBLEM);
 renderConfigProviders();
+updateConfigSummary();
+updateRuntimeStatus();
+renderRunHistory();
 // Auto-dismiss hint after 8 seconds or first interaction
 let hintEl=document.getElementById('hint-overlay');
 if(hintEl){
@@ -2385,6 +3429,7 @@ let wsEventLog=[];
 let backendDriven=false;
 let backendEventQueue=[];
 let processingBackendEvents=false;
+let lastWarResults=null;
 
 function connectWebSocket(){
   const proto=location.protocol==='https:'?'wss:':'ws:';
@@ -2399,6 +3444,7 @@ function connectWebSocket(){
     console.log('[WS] Connected to EvoHive backend');
     addBattleLog('Backend connected — Live mode available');
     wsLiveMode=true;
+    setProgress(currentProgress||0,'Connected',lang==='zh'?'后端已连接，可进入实时模式':'Backend connected, live mode ready');
     const indicator=document.createElement('div');
     indicator.id='ws-indicator';
     indicator.style.cssText='position:absolute;top:8px;left:8px;z-index:11;background:rgba(0,40,0,.9);border:1px solid #00ff41;border-radius:4px;padding:3px 8px;font-size:9px;color:#00ff41;font-family:"Share Tech Mono",monospace;pointer-events:none';
@@ -2421,6 +3467,8 @@ function connectWebSocket(){
   wsConn.onclose=()=>{
     console.log('[WS] Disconnected');
     wsLiveMode=false;
+    setProgress(currentProgress||0,'Offline',lang==='zh'?'后端连接已断开，当前处于离线状态':'Backend disconnected, currently offline');
+    setRunError(lang==='zh'?'后端连接已断开，请稍后重试。':'Backend connection lost. Please retry in a moment.');
     const ind=document.getElementById('ws-indicator');
     if(ind){ind.textContent='○ OFFLINE';ind.style.borderColor='#ff3333';ind.style.color='#ff3333';}
     setTimeout(()=>{if(!wsLiveMode)connectWebSocket();},3000);
@@ -2428,6 +3476,8 @@ function connectWebSocket(){
   wsConn.onerror=()=>{
     console.log('[WS] Connection failed — standalone mode');
     wsLiveMode=false;
+    setProgress(currentProgress||0,'Offline',lang==='zh'?'WebSocket 连接失败，将回退到本地演示模式':'WebSocket connection failed, falling back to standalone mode');
+    setRunError(lang==='zh'?'WebSocket 连接失败，当前处于离线演示模式。':'WebSocket connection failed. Currently in standalone demo mode.');
   };
 }
 
@@ -2452,7 +3502,20 @@ const EVENT_PHASE_MAP={
 function handleBackendMessageQueued(msg){
   switch(msg.type){
     case 'war_started':
+      currentRunError='';
       addBattleLog(`Backend war started: ${msg.config.total} agents, ${msg.config.gens} gens, mode=${msg.config.mode}`);
+      if(msg.config.problem) setCurrentProblem(msg.config.problem);
+      currentMode=(msg.config.mode||currentMode||'fast').toLowerCase();
+      if(msg.config.budget!==undefined) currentBudget=Number(msg.config.budget||currentBudget);
+      if(msg.config.enable_search!==undefined) currentSearch=!!msg.config.enable_search;
+      setProgress(3,'Deployment',lang==='zh'?'后端已开始运行 EvoHive':'Backend started EvoHive run');
+      setBroadcast(
+        lang==='zh'?'战役正式开始':'War is live',
+        lang==='zh'?`后端已经部署 ${msg.config.total} 个单位，观众可以开始跟踪阵营变化。`:`${msg.config.total} units are deployed. The audience can now track faction momentum.`,
+        lang==='zh'?'关注每一代结束时的最佳分数和冠军变化。':'Watch best-fitness jumps and champion changes at the end of each generation.',
+        lang==='zh'?'实时开战':'Live war'
+      );
+      updateRuntimeStatus();
       addKillFeed('LIVE: Evolution engine running','#00ff41');
       break;
     case 'evolution_event':
@@ -2469,6 +3532,22 @@ function handleBackendMessageQueued(msg){
       break;
     case 'war_error':
       addBattleLog(`Backend error: ${msg.error}`);
+      setProgress(currentProgress,'Error',msg.error||'Unknown backend error');
+      setRunError(msg.error||'Unknown backend error');
+      saveRunHistoryEntry({
+        problem: currentProblem,
+        mode: currentMode,
+        budget: currentBudget,
+        enableSearch: currentSearch,
+        total: TOTAL,
+        gens: GENS,
+        providers: [...selectedProviders],
+        cost: 0,
+        apiCalls: currentApiCalls||0,
+        status: 'error',
+        time: new Date().toLocaleString(),
+      });
+      renderRunHistory();
       addKillFeed(`ERROR: ${msg.error}`,'#ff3333');
       break;
     case 'pong':
@@ -2508,7 +3587,11 @@ function drainStatusUpdates(){
     const peek=backendEventQueue[0];
     if(peek.type==='evolution_event' && peek.event_type==='status_update'){
       backendEventQueue.shift();
-      if(peek.data&&peek.data.message) addBattleLog(`[STATUS] ${peek.data.message}`);
+      if(peek.data&&peek.data.message){
+        currentStatusText=peek.data.message;
+        updateRuntimeStatus();
+        addBattleLog(`[STATUS] ${peek.data.message}`);
+      }
     } else break;
   }
 }
@@ -2533,6 +3616,23 @@ async function processEvolutionEvent(msg){
   const evtType=msg.event_type;
   const data=msg.data||{};
 
+  if(evtType==='evaluation_progress'){
+    const done=Number(data.done||data.current||0);
+    const total=Number(data.total||0);
+    if(total>0){
+      const pct=8+(done/total)*10;
+      setProgress(pct,lang==='zh'?'评估中':'Evaluation',`${done}/${total}`);
+    }
+  }
+  if(evtType==='elo_round_complete'){
+    const round=Number(data.round||0);
+    const totalRounds=Number(data.total_rounds||data.total||0);
+    if(totalRounds>0){
+      const pct=18+(round/totalRounds)*10;
+      setProgress(pct,lang==='zh'?'Elo 对战':'Elo Tournament',`${round}/${totalRounds}`);
+    }
+  }
+
   // Update phase indicator
   const phaseIdx=EVENT_PHASE_MAP[evtType];
   if(phaseIdx!==undefined){
@@ -2542,6 +3642,7 @@ async function processEvolutionEvent(msg){
     if(phase){
       document.getElementById('phase-name').textContent=lang==='zh'?phase.zh:phase.en;
       document.getElementById('phase-sub').textContent=lang==='zh'?phase.sub_zh:phase.sub_en;
+      setProgress(((phaseIdx+1)/PHASES.length)*100,lang==='zh'?phase.zh:phase.en,lang==='zh'?phase.sub_zh:phase.sub_en);
     }
   }
 
@@ -2636,6 +3737,12 @@ async function processEvolutionEvent(msg){
   }
   else if(evtType==='elo_tournament_started'){
     // Progress-driven combat: each elo_round_complete triggers a full combat round
+    setBroadcast(
+      lang==='zh'?'Elo 锦标赛开始':'Elo tournament begins',
+      lang==='zh'?'顶级单位正在通过面对面对战重排榜单。':'Top units are now reshuffling the board through direct duels.',
+      lang==='zh'?'观众现在最值得看的是谁能在连续对局里守住连胜。':'The key spectator question is who can hold momentum across repeated rounds.',
+      lang==='zh'?'对战阶段':'Duel phase'
+    );
     await announce();
     const alive=aliveAgents();
     if(alive.length<2) return;
@@ -2780,6 +3887,12 @@ async function processEvolutionEvent(msg){
     screenFlash('#ff0000',.2);screenShake(4);
     const killed=data.eliminated_count||data.eliminated||0;
     const survived=data.survived_count||data.survived||0;
+    setBroadcast(
+      lang==='zh'?'淘汰阶段正在重写战局':'Selection is rewriting the board',
+      lang==='zh'?`${killed} 个单位被淘汰，${survived} 个单位继续存活。`:`${killed} units were eliminated and ${survived} remain alive.`,
+      lang==='zh'?'这是观众最容易看出阵营差距和冠军稳定性的阶段。':'This is where faction gaps and champion stability become obvious.',
+      lang==='zh'?'生存洗牌':'Survival shake-up'
+    );
     addKillFeed(`Selection: ${killed} eliminated, ${survived} survived`,'#ff3333');
     addBattleLog(`Selection: keeping top ${survived} (${killed} eliminated)`);
     if(killed>0){
@@ -3012,6 +4125,12 @@ async function processEvolutionEvent(msg){
   }
   else if(evtType==='red_team_complete'){
     redMonsters=[];
+    setBroadcast(
+      lang==='zh'?'红队攻击告一段落':'Red-team pressure wave complete',
+      lang==='zh'?'顶级单位已经经历一轮脆弱性测试。':'The leading units have now survived a vulnerability check.',
+      lang==='zh'?'接下来最值得关注的是冠军是否还能稳住优势。':'Now watch whether the champion can still hold the lead.',
+      lang==='zh'?'脆弱性检查':'Stress signal'
+    );
     addKillFeed('Red team attack complete','#ff4444');
     await sleep(300);
   }
@@ -3103,24 +4222,47 @@ async function processEvolutionEvent(msg){
   }
   else if(evtType==='refinement_complete'){
     forgeActive=false;
+    setBroadcast(
+      lang==='zh'?'冠军方案完成精炼':'Champion solution refined',
+      lang==='zh'?'当前最佳单位已经进入最终锻造，答案质量正在上提。':'The leading unit has entered final refinement and the answer quality is being lifted.',
+      lang==='zh'?'这通常是观众等待最终冠军定型的高潮节点。':'This is usually the climax where the audience waits for the final champion to lock in.',
+      lang==='zh'?'最终锻造':'Final forge'
+    );
     screenFlash('#ffd700',.15);
     addKillFeed('Refinement complete — champion forged','#ffd700');
     camReset();
     await sleep(300);
   }
   else if(evtType==='run_complete'){
+    setBroadcast(
+      lang==='zh'?'最终冠军已经诞生':'The final champion is decided',
+      lang==='zh'?'本次进化战争已经结束，观众可以查看最终答案和决策摘要。':'This evolution war is complete. The audience can now inspect the final answer and decision deck.',
+      lang==='zh'?'从这里开始，重点从观战转向理解冠军方案为什么胜出。':'From here, the focus shifts from combat to understanding why the champion won.',
+      lang==='zh'?'终局时刻':'Endgame'
+    );
     screenFlash('#ffd700',.2);
     addKillFeed('EVOLUTION COMPLETE','#ffd700');
     await sleep(500);
   }
   else if(evtType==='status_update'){
-    if(data.message) addBattleLog(`[STATUS] ${data.message}`);
+    if(data.message){
+      currentStatusText=data.message;
+      updateRuntimeStatus();
+      addBattleLog(`[STATUS] ${data.message}`);
+    }
   }
 }
 
 async function processGenSummary(data){
   currentGen=data.generation||currentGen;
+  setProgress(Math.max(currentProgress,((currentGen)/(Math.max(GENS,1)+1))*100),`Generation ${currentGen}`,`Best ${Number(data.best_fitness||0).toFixed(2)} | Alive ${data.alive_count||'?'}`);
   document.getElementById('gen-counter').textContent=`GEN ${currentGen}`;
+  setBroadcast(
+    lang==='zh'?`第 ${currentGen} 代结束`:`Generation ${currentGen} complete`,
+    lang==='zh'?`最佳分数 ${Number(data.best_fitness||0).toFixed(2)}，平均分 ${Number(data.avg_fitness||0).toFixed(2)}。`:`Best score ${Number(data.best_fitness||0).toFixed(2)}, average ${Number(data.avg_fitness||0).toFixed(2)}.`,
+    lang==='zh'?`当前存活 ${data.alive_count||'?'} 个单位。观众现在最值得看的是冠军是否继续领先。`:`${data.alive_count||'?'} units remain alive. The key question is whether the champion keeps the lead.`,
+    lang==='zh'?'代际总结':'Generation recap'
+  );
   addBattleLog(`=== Generation ${currentGen} complete ===`);
   addBattleLog(`  Best: ${Number(data.best_fitness||0).toFixed(2)} | Avg: ${Number(data.avg_fitness||0).toFixed(2)} | Alive: ${data.alive_count||'?'}`);
   addKillFeed(`Gen ${currentGen}: best=${Number(data.best_fitness||0).toFixed(2)}`,'#ffd700');
@@ -3132,6 +4274,25 @@ async function processGenSummary(data){
 
 async function processWarComplete(results){
   addBattleLog('========== EVOLUTION COMPLETE ==========');
+  lastWarResults=results;
+  if(results.problem) setCurrentProblem(results.problem);
+  currentApiCalls=results.total_api_calls||0;
+  setProgress(100,lang==='zh'?'进化完成':'Evolution Complete',lang==='zh'?'最终结果已生成':'Final result package generated');
+  updateRuntimeStatus();
+  saveRunHistoryEntry({
+    problem: results.problem||currentProblem,
+    mode: currentMode,
+    budget: currentBudget,
+    enableSearch: currentSearch,
+    total: TOTAL,
+    gens: GENS,
+    providers: [...selectedProviders],
+    cost: Number(results.estimated_cost||0),
+    apiCalls: results.total_api_calls||0,
+    status: currentRunError?'error':'complete',
+    time: new Date().toLocaleString(),
+  });
+  renderRunHistory();
   addBattleLog(`API calls: ${results.total_api_calls||0} | Cost: $${Number(results.estimated_cost||0).toFixed(3)}`);
   addBattleLog(`Events: ${results.event_count||0}`);
   addKillFeed('EVOLUTION COMPLETE','#ffd700');

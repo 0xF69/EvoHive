@@ -84,6 +84,9 @@ async def run_real_evolution(ws: WebSocket, config: dict):
     providers = config.get("providers", ["deepseek"])
     total = config.get("total", 15)
     gens = config.get("gens", 2)
+    mode = config.get("mode", "fast")
+    budget = float(config.get("budget", 0.5) or 0.5)
+    enable_search = bool(config.get("enable_search", False))
     problem = config.get("problem",
         "Write a Python function `longest_palindrome(s: str) -> str` that "
         "returns the longest palindromic substring in s. "
@@ -130,11 +133,11 @@ async def run_real_evolution(ws: WebSocket, config: dict):
         enable_pressure_test=True,
         # Disable features that need OpenAI embedding or web search
         enable_swarm=False,
-        enable_web_search=False,
+        enable_web_search=enable_search,
         enable_swiss_tournament=True,
         enable_adaptive=True,
         # Mode
-        mode="fast",
+        mode=mode,
     )
 
     # Send war_started
@@ -145,6 +148,9 @@ async def run_real_evolution(ws: WebSocket, config: dict):
             "gens": evo_config.generations,
             "mode": "REAL",
             "providers": providers,
+            "problem": problem,
+            "budget": budget,
+            "enable_search": enable_search,
         }
     })
 
@@ -209,7 +215,7 @@ async def run_real_evolution(ws: WebSocket, config: dict):
         on_generation_complete=on_gen_complete,
         on_status=on_status,
         emitter=emitter,
-        budget_limit=0.50,  # $0.50 safety cap for testing
+        budget_limit=budget,
     )
 
     # Send war_complete with real results
@@ -258,6 +264,7 @@ async def run_real_evolution(ws: WebSocket, config: dict):
     await ws.send_json({
         "type": "war_complete",
         "results": {
+            "problem": problem,
             "champion": champion_data,
             "total_api_calls": result.total_api_calls,
             "estimated_cost": round(result.estimated_cost, 3),
@@ -571,12 +578,21 @@ async def run_mock_evolution(ws: WebSocket, config: dict):
     await ws.send_json({
         "type": "war_complete",
         "results": {
+            "problem": config.get("problem", "Mock evolution test"),
             "champion": champion.to_dict(),
             "total_api_calls": api_calls,
             "estimated_cost": round(api_calls * 0.001, 3),
             "event_count": len(all_events),
             "generations_data": generations_data,
             "top5": [a.to_dict() for a in agents[:5]],
+            "evolved_answer": (
+                f"Final EvoHive mock answer for: {config.get('problem', 'Mock evolution test')}\n\n"
+                "1. Define a narrow target segment and position the offer around a measurable outcome.\n"
+                "2. Start with a low-friction entry tier to maximize adoption and feedback volume.\n"
+                "3. Reserve premium pricing for automation depth, team workflows, and advanced reliability.\n"
+                "4. Use battle-tested proof points, benchmarks, and before/after comparisons in the final pitch.\n"
+                "5. Keep iterating based on real user objections, not just internal assumptions."
+            ),
         }
     })
 
