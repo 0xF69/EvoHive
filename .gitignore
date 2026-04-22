@@ -45,3 +45,4 @@ Thumbs.db
 *.log
 evohive_checkpoints/
 evohive_results/
+evohive_runs/
