@@ -19,6 +19,7 @@
 html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:'Share Tech Mono',monospace}
 /* === LAYOUT === */
 #app{display:flex;width:100%;height:100%}
+#left-sidebar{width:280px;background:var(--panel);border-right:2px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden;flex-shrink:0;padding:12px;gap:12px;transition:width .25s ease,transform .25s ease,border-color .25s ease}
 #canvas-wrap{flex:1;position:relative;overflow:hidden}
 canvas{display:block;width:100%;height:100%;cursor:grab}
 #sidebar{width:280px;background:var(--panel);border-left:2px solid var(--border);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0;transition:width .25s ease,transform .25s ease,border-color .25s ease}
@@ -61,6 +62,19 @@ canvas{display:block;width:100%;height:100%;cursor:grab}
 .telemetry-box{background:#0a150a;border:1px solid var(--border);border-radius:6px;padding:8px}
 .telemetry-val{font-family:'Press Start 2P',monospace;font-size:10px;color:var(--hp-high)}
 .telemetry-lbl{font-size:9px;color:var(--dim);margin-top:4px}
+.intel-card{background:#0a150a;border:1px solid var(--border);border-radius:8px;padding:10px 12px}
+.intel-head{display:flex;justify-content:space-between;gap:8px;align-items:flex-start;margin-bottom:10px}
+.intel-title{font-family:'Press Start 2P',monospace;font-size:8px;color:var(--gold);letter-spacing:1px}
+.intel-note{font-size:9px;color:var(--dim);line-height:1.4;text-align:right}
+.intel-stack{display:flex;flex-direction:column;gap:8px}
+.intel-pane{padding:9px 10px;border-radius:8px;background:rgba(255,255,255,.03);border:1px solid rgba(107,143,107,.18)}
+.intel-pane strong{display:block;font-size:10px;color:var(--text);line-height:1.45}
+.intel-pane span{display:block;font-size:9px;color:var(--dim);line-height:1.45;margin-top:3px}
+.intel-empty{font-size:9px;color:var(--dim);line-height:1.55}
+.intel-mini-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.intel-mini{padding:8px;border-radius:8px;background:rgba(255,255,255,.02);border:1px solid rgba(107,143,107,.16)}
+.intel-mini strong{display:block;font-family:'Press Start 2P',monospace;font-size:8px;color:var(--gold);margin-bottom:5px}
+.intel-mini span{display:block;font-size:10px;color:var(--text)}
 /* Faction list */
 .faction-card{display:flex;align-items:center;gap:8px;padding:4px 0;cursor:pointer;border-radius:2px;transition:background .2s}
 .faction-card:hover{background:rgba(255,255,255,.05)}
@@ -81,22 +95,36 @@ canvas{display:block;width:100%;height:100%;cursor:grab}
 #hud{position:absolute;top:0;left:0;right:0;display:flex;justify-content:center;align-items:center;padding:8px 16px;pointer-events:none;z-index:10}
 #alive-counter{font-family:'Press Start 2P',monospace;font-size:14px;color:var(--hp-high);text-shadow:0 0 10px rgba(0,255,65,.5)}
 #gen-counter{font-family:'Press Start 2P',monospace;font-size:10px;color:var(--gold);margin-left:20px}
-#mission-rail{position:absolute;top:48px;left:50%;transform:translateX(-50%);z-index:10;pointer-events:none;display:flex;align-items:center;gap:10px;max-width:min(720px,calc(100vw - 340px));padding:10px 14px;background:linear-gradient(180deg,rgba(7,14,10,.86),rgba(7,14,10,.68));border:1px solid rgba(107,143,107,.26);border-radius:12px;box-shadow:0 18px 40px rgba(0,0,0,.25)}
+#mobile-status-strip{display:none;position:absolute;top:8px;left:8px;right:48px;z-index:11;pointer-events:none;gap:8px;flex-wrap:wrap}
+.mobile-status-pill{display:flex;align-items:center;gap:6px;padding:7px 10px;border-radius:999px;background:rgba(7,14,10,.86);border:1px solid rgba(107,143,107,.24);backdrop-filter:blur(8px);font-size:9px;line-height:1}
+.mobile-status-pill strong{font-family:'Press Start 2P',monospace;font-size:7px;color:var(--gold);letter-spacing:.8px}
+.mobile-status-pill span{color:var(--text)}
+#mission-rail{position:absolute;top:48px;left:50%;transform:translateX(-50%);z-index:10;pointer-events:none;display:flex;align-items:center;gap:10px;max-width:min(720px,calc(100vw - 640px));padding:10px 14px;background:linear-gradient(180deg,rgba(7,14,10,.86),rgba(7,14,10,.68));border:1px solid rgba(107,143,107,.26);border-radius:12px;box-shadow:0 18px 40px rgba(0,0,0,.25)}
 .mission-rail-kicker{font-family:'Press Start 2P',monospace;font-size:8px;color:var(--gold);letter-spacing:1px;flex-shrink:0}
 .mission-rail-text{font-size:10px;line-height:1.5;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mission-rail-tip{font-size:9px;color:var(--dim);flex-shrink:0}
-#broadcast-card{position:absolute;top:94px;left:50%;transform:translateX(-50%);z-index:10;pointer-events:none;display:flex;flex-direction:column;gap:8px;max-width:min(760px,calc(100vw - 360px));padding:12px 14px;background:linear-gradient(180deg,rgba(7,14,10,.92),rgba(7,14,10,.74));border:1px solid rgba(107,143,107,.26);border-radius:14px;box-shadow:0 18px 40px rgba(0,0,0,.25)}
+#broadcast-card{position:absolute;top:94px;left:18px;transform:none;z-index:10;pointer-events:none;display:flex;flex-direction:column;gap:8px;width:min(360px,calc(100vw - 36px));max-width:min(360px,calc(100vw - 36px));padding:12px 14px;background:linear-gradient(180deg,rgba(7,14,10,.92),rgba(7,14,10,.74));border:1px solid rgba(107,143,107,.26);border-radius:14px;box-shadow:0 18px 40px rgba(0,0,0,.25)}
 .broadcast-head{display:flex;justify-content:space-between;gap:10px;align-items:center}
+.broadcast-head-actions{display:flex;align-items:center;gap:8px;pointer-events:auto}
 .broadcast-kicker{font-family:'Press Start 2P',monospace;font-size:8px;color:var(--gold);letter-spacing:1px}
 .broadcast-tag{font-size:9px;color:var(--dim)}
+.broadcast-toggle{height:26px;min-width:64px;padding:0 10px;border-radius:999px;border:1px solid rgba(107,143,107,.28);background:rgba(9,19,11,.92);color:var(--text);font-family:'Share Tech Mono',monospace;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.broadcast-toggle:hover{border-color:var(--gold);color:var(--gold);background:#102010}
 .broadcast-title{font-family:'Press Start 2P',monospace;font-size:10px;line-height:1.5;color:#eef6ee}
 .broadcast-sub{font-size:10px;line-height:1.6;color:var(--dim)}
-.broadcast-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:10px}
+.broadcast-metrics{display:flex;flex-wrap:wrap;gap:8px;pointer-events:none}
+.broadcast-metric{display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:rgba(255,255,255,.04);border:1px solid rgba(107,143,107,.16);font-size:9px;line-height:1;color:var(--dim)}
+.broadcast-metric strong{font-family:'Press Start 2P',monospace;font-size:7px;color:var(--gold);letter-spacing:.8px}
+.broadcast-metric span{color:var(--text)}
+.broadcast-grid{display:grid;grid-template-columns:1fr;gap:8px}
 .broadcast-panel{background:rgba(255,255,255,.03);border:1px solid rgba(107,143,107,.18);border-radius:10px;padding:10px 12px}
 .broadcast-panel-label{font-family:'Press Start 2P',monospace;font-size:7px;color:var(--gold);letter-spacing:1px;margin-bottom:6px}
 .broadcast-champion{font-size:11px;line-height:1.6;color:var(--text)}
 .broadcast-meta{font-size:10px;line-height:1.55;color:var(--dim)}
 .broadcast-summary{font-size:10px;line-height:1.65;color:var(--text)}
+#broadcast-card.collapsed{gap:6px;padding-bottom:10px}
+#broadcast-card.collapsed .broadcast-sub,
+#broadcast-card.collapsed .broadcast-grid{display:none}
 #canvas-wrap::before{content:'';position:absolute;inset:0;pointer-events:none;z-index:1;background:
   linear-gradient(rgba(74,158,255,.07),rgba(74,158,255,0) 24%),
   linear-gradient(90deg,rgba(255,255,255,.04) 1px,transparent 1px),
@@ -126,12 +154,27 @@ canvas{display:block;width:100%;height:100%;cursor:grab}
 .res-card{background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:12px;text-align:center}
 .res-card-val{font-family:'Press Start 2P',monospace;font-size:14px;color:var(--hp-high)}
 .res-card-lbl{font-size:10px;color:var(--dim);margin-top:4px}
+.res-hero-grid{display:grid;grid-template-columns:1.12fr .88fr;gap:14px;align-items:start}
+.res-hero-main{min-width:0}
+.res-hero-side{display:flex;flex-direction:column;gap:10px}
+.res-spotlight{background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.02));border:1px solid rgba(107,143,107,.22);border-radius:12px;padding:12px}
+.res-spotlight strong{display:block;font-family:'Press Start 2P',monospace;font-size:8px;color:var(--gold);margin-bottom:8px}
+.res-spotlight p{font-size:10px;line-height:1.65;color:var(--text)}
+.res-micro-list{display:flex;flex-direction:column;gap:8px}
+.res-micro-row{display:flex;justify-content:space-between;gap:10px;font-size:10px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,.05)}
+.res-micro-row:last-child{border-bottom:none;padding-bottom:0}
+.res-micro-row span:first-child{color:var(--dim)}
 .res-section{margin-bottom:20px}
 .res-section-title{font-family:'Press Start 2P',monospace;font-size:10px;color:var(--gold);margin-bottom:8px;border-bottom:1px solid var(--border);padding-bottom:4px}
 .res-summary-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:14px;margin-bottom:20px}
 .res-summary-card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px}
 .res-summary-card.error{border-color:rgba(255,51,51,.45);background:linear-gradient(180deg,rgba(42,10,10,.95),rgba(20,8,8,.92))}
 .res-summary-text{font-size:11px;line-height:1.7;color:var(--text)}
+.res-pro-report{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px}
+.res-callout{background:linear-gradient(180deg,rgba(12,22,12,.96),rgba(9,15,9,.9));border:1px solid rgba(107,143,107,.25);border-radius:12px;padding:14px}
+.res-callout p{font-size:11px;line-height:1.7;color:var(--text)}
+.res-chip-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.res-chip{padding:6px 10px;border-radius:999px;background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.22);font-size:10px;color:#f7efb7}
 .res-list{display:flex;flex-direction:column;gap:8px}
 .res-list-row{display:flex;justify-content:space-between;gap:10px;font-size:10px;border-bottom:1px solid rgba(255,255,255,.05);padding-bottom:6px}
 .res-list-row:last-child{border-bottom:none;padding-bottom:0}
@@ -145,12 +188,19 @@ canvas{display:block;width:100%;height:100%;cursor:grab}
 .res-log{background:#0a150a;border:1px solid rgba(107,143,107,.22);border-radius:10px;padding:12px;max-height:220px;overflow-y:auto}
 .res-log-entry{font-size:10px;line-height:1.55;color:var(--text);padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05)}
 .res-log-entry:last-child{border-bottom:none}
-.res-faction-row{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:11px}
+.res-faction-row{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;padding:8px 0;font-size:11px}
+.res-faction-copy{min-width:0}
+.res-faction-copy strong{display:block;font-size:11px;color:var(--text);line-height:1.4}
+.res-faction-copy span{display:block;font-size:9px;color:var(--dim);line-height:1.45}
+.res-faction-bar{grid-column:2 / span 2;height:8px;background:#142014;border-radius:999px;border:1px solid rgba(107,143,107,.18);overflow:hidden}
+.res-faction-bar-fill{height:100%;border-radius:999px}
 .res-rank-row{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:11px;border-bottom:1px solid rgba(255,255,255,.05)}
 .res-rank-num{font-family:'Press Start 2P',monospace;font-size:10px;width:24px;text-align:center}
 #res-answer{background:#0a150a;border:1px solid var(--border);border-radius:4px;padding:12px;font-size:11px;line-height:1.6;color:var(--text);max-height:200px;overflow-y:auto;margin-top:8px}
 .res-action-btn{display:block;margin:24px auto 0;background:var(--gold);color:#000;font-family:'Press Start 2P',monospace;font-size:10px;border:none;padding:10px 24px;cursor:pointer;border-radius:2px}
 .res-action-btn:hover{background:#fff}
+.res-action-rail{position:sticky;bottom:12px;display:flex;justify-content:center;gap:12px;flex-wrap:wrap;padding:12px 14px;margin-top:24px;background:linear-gradient(180deg,rgba(8,17,8,.82),rgba(8,17,8,.96));border:1px solid rgba(107,143,107,.22);border-radius:14px;backdrop-filter:blur(10px)}
+.res-action-rail .res-action-btn{margin:0}
 /* === AGENT DETAIL POPUP === */
 #agent-detail{position:absolute;background:var(--panel);border:1px solid var(--gold);border-radius:4px;padding:10px;font-size:10px;z-index:15;display:none;pointer-events:none;min-width:180px}
 .ad-name{font-family:'Press Start 2P',monospace;font-size:9px;color:var(--gold);margin-bottom:6px}
@@ -158,6 +208,25 @@ canvas{display:block;width:100%;height:100%;cursor:grab}
 .ad-row span:first-child{color:var(--dim)}
 /* War briefing */
 #briefing-panel{position:absolute;top:18px;left:18px;z-index:11;width:min(370px,calc(100vw - 36px));pointer-events:none}
+#left-sidebar #briefing-panel,#left-sidebar #broadcast-card{position:static;top:auto;left:auto;right:auto;transform:none;width:100%!important;max-width:none!important;pointer-events:auto;z-index:auto;box-shadow:none}
+#left-sidebar #briefing-panel{order:1}
+#left-sidebar #broadcast-card{order:2}
+#left-sidebar .briefing-shell,#left-sidebar #broadcast-card{background:#0a150a;border:1px solid var(--border);border-radius:8px;box-shadow:none}
+#left-sidebar .briefing-head{padding:10px 12px;cursor:default}
+#left-sidebar .briefing-body{padding:10px 12px 12px}
+#left-sidebar .briefing-size-btn,#left-sidebar #briefing-toggle,#left-sidebar .briefing-resize{display:none!important}
+#left-sidebar .briefing-status{display:none}
+#left-sidebar .briefing-title{font-size:10px;line-height:1.45}
+#left-sidebar .briefing-copy-quiet{margin-top:10px}
+#left-sidebar .doctrine-grid{grid-template-columns:1fr}
+#left-sidebar .tier-strip{grid-template-columns:repeat(2,1fr)}
+#left-sidebar .phase-legend{grid-template-columns:1fr}
+#left-sidebar .broadcast-head{margin-bottom:2px}
+#left-sidebar .broadcast-grid{grid-template-columns:1fr}
+#left-sidebar .broadcast-title{font-size:9px;line-height:1.5}
+#left-sidebar .broadcast-sub{font-size:9px;line-height:1.55}
+#left-sidebar .broadcast-metric{flex:1 1 calc(50% - 6px)}
+#left-sidebar .broadcast-panel{background:rgba(255,255,255,.03);border:1px solid rgba(107,143,107,.18)}
 .briefing-shell{background:linear-gradient(180deg,rgba(7,14,10,.9),rgba(6,11,9,.78));border:1px solid rgba(107,143,107,.45);border-radius:10px;box-shadow:0 20px 60px rgba(0,0,0,.35),inset 0 0 0 1px rgba(255,255,255,.03);backdrop-filter:blur(8px);overflow:hidden}
 .briefing-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:14px 16px 10px;border-bottom:1px solid rgba(107,143,107,.22);background:linear-gradient(90deg,rgba(255,215,0,.08),transparent);pointer-events:auto;cursor:grab}
 .briefing-head:active{cursor:grabbing}
@@ -170,11 +239,25 @@ canvas{display:block;width:100%;height:100%;cursor:grab}
 .briefing-size-btn:hover{border-color:var(--gold);color:var(--gold);background:#102010}
 .briefing-toggle{width:28px;height:28px;border-radius:7px;border:1px solid rgba(107,143,107,.28);background:rgba(9,19,11,.92);color:var(--gold);font-family:'Press Start 2P',monospace;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center}
 .briefing-toggle:hover{border-color:var(--gold);background:#102010}
+.briefing-detail-btn{height:28px;min-width:72px;padding:0 10px;border-radius:7px;border:1px solid rgba(107,143,107,.28);background:rgba(9,19,11,.92);color:var(--text);font-family:'Share Tech Mono',monospace;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.briefing-detail-btn:hover{border-color:var(--gold);color:var(--gold);background:#102010}
 .briefing-body{padding:12px 16px 14px}
 #briefing-panel.minimized .briefing-body{display:none}
-#briefing-panel.minimized .briefing-head{border-bottom:none}
+#briefing-panel.minimized{width:auto!important;max-width:min(360px,calc(100vw - 36px))}
+#briefing-panel.minimized .briefing-shell{border-radius:999px;box-shadow:0 20px 40px rgba(0,0,0,.28),inset 0 0 0 1px rgba(255,255,255,.03)}
+#briefing-panel.minimized .briefing-head{padding:10px 12px;border-bottom:none;align-items:center;background:linear-gradient(90deg,rgba(255,215,0,.1),rgba(74,158,255,.06))}
+#briefing-panel.minimized .briefing-head > div:first-child{display:flex;align-items:center;gap:10px;min-width:0}
+#briefing-panel.minimized .briefing-kicker{margin-bottom:0}
+#briefing-panel.minimized .briefing-title{font-size:10px;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:190px}
+#briefing-panel.minimized .briefing-status,#briefing-panel.minimized .briefing-size-group{display:none}
+.briefing-copy-quiet{font-size:10px;line-height:1.55;color:var(--dim);margin-top:8px}
+.briefing-core{display:flex;flex-direction:column;gap:12px}
+.briefing-deep{display:grid;gap:12px;margin-top:12px}
+#briefing-panel.compact .briefing-copy{display:none}
+#briefing-panel.compact .briefing-deep{display:none}
+#briefing-panel.compact .briefing-problem-text{-webkit-line-clamp:2}
 .briefing-mini{display:none;padding:0 16px 14px;font-size:10px;line-height:1.5;color:var(--dim);pointer-events:none}
-#briefing-panel.minimized .briefing-mini{display:block}
+#briefing-panel.minimized .briefing-mini{display:none}
 .briefing-resize{position:absolute;right:8px;bottom:8px;width:18px;height:18px;pointer-events:auto;cursor:nwse-resize;display:flex;align-items:flex-end;justify-content:flex-end}
 .briefing-resize::before{content:'';width:12px;height:12px;background:
   linear-gradient(135deg,transparent 0 42%,rgba(255,215,0,.85) 42% 50%,transparent 50% 100%),
@@ -201,6 +284,8 @@ canvas{display:block;width:100%;height:100%;cursor:grab}
 .phase-legend-item{display:flex;gap:8px;align-items:flex-start;padding:8px;border-left:2px solid rgba(255,215,0,.4);background:rgba(10,21,10,.52);border-radius:0 8px 8px 0}
 .phase-legend-item strong{display:block;font-size:10px;color:#f5fff5;margin-bottom:2px}
 .phase-legend-item span{display:block;font-size:9px;line-height:1.45;color:var(--dim)}
+.broadcast-card-peak{box-shadow:0 0 0 1px rgba(255,215,0,.18),0 20px 40px rgba(255,140,0,.18);border-color:rgba(255,215,0,.4)!important;background:linear-gradient(180deg,rgba(20,18,8,.96),rgba(10,15,8,.9))!important}
+.broadcast-tag.peak{color:#111;background:linear-gradient(90deg,#ffd700,#ff9f1a);padding:3px 8px;border-radius:999px}
 /* Scrollbar */
 ::-webkit-scrollbar{width:4px}
 ::-webkit-scrollbar-track{background:var(--bg)}
@@ -234,10 +319,22 @@ button:focus-visible,#lang-btn:focus-visible{outline:2px solid var(--gold);outli
 /* === CONFIG MODAL === */
 #config-modal{position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:100;display:flex;align-items:center;justify-content:center;overflow-y:auto;padding:20px}
 .cfg-box{background:var(--panel);border:1px solid var(--border);border-radius:6px;width:820px;max-width:95vw;max-height:90vh;overflow-y:auto;padding:0}
-.cfg-header{padding:16px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.cfg-header{padding:16px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:2;background:linear-gradient(180deg,rgba(13,26,13,.98),rgba(13,26,13,.92));backdrop-filter:blur(10px)}
 .cfg-header h1{font-family:'Press Start 2P',monospace;font-size:12px;color:var(--gold);letter-spacing:2px}
 .cfg-header span{font-size:11px;color:var(--dim)}
 .cfg-body{padding:20px 24px;display:flex;flex-direction:column;gap:20px}
+.cfg-quickstart{display:grid;grid-template-columns:1.1fr .9fr;gap:14px}
+.cfg-quick-panel{background:#0a150a;border:1px solid var(--border);border-radius:10px;padding:14px}
+.cfg-section-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px}
+.cfg-section-note{font-size:10px;color:var(--dim);line-height:1.45}
+.cfg-preset-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.cfg-preset{background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.02));border:1px solid rgba(107,143,107,.24);border-radius:10px;padding:12px;cursor:pointer;text-align:left;transition:border-color .2s,transform .2s,background .2s}
+.cfg-preset:hover{border-color:var(--gold);background:linear-gradient(180deg,rgba(255,215,0,.08),rgba(255,255,255,.03));transform:translateY(-1px)}
+.cfg-preset strong{display:block;font-family:'Press Start 2P',monospace;font-size:8px;color:var(--gold);line-height:1.5;margin-bottom:8px}
+.cfg-preset span{display:block;font-size:10px;line-height:1.55;color:var(--text)}
+.cfg-prompt-suggestions{display:flex;flex-wrap:wrap;gap:8px}
+.cfg-suggestion{border:1px solid rgba(107,143,107,.24);background:#081108;color:var(--text);border-radius:999px;padding:8px 12px;font-size:10px;line-height:1.35;cursor:pointer;transition:border-color .2s,background .2s,color .2s}
+.cfg-suggestion:hover{border-color:var(--gold);color:var(--gold);background:#0d180d}
 .cfg-briefing{display:grid;grid-template-columns:1.35fr .95fr;gap:14px}
 .cfg-brief-panel,.cfg-brief-stats{background:#0a150a;border:1px solid var(--border);border-radius:8px;padding:14px}
 .cfg-brief-panel p{font-size:11px;line-height:1.7;color:var(--text)}
@@ -280,8 +377,17 @@ button:focus-visible,#lang-btn:focus-visible{outline:2px solid var(--gold);outli
 .cfg-gen-row{display:flex;align-items:center;gap:12px;margin-top:8px}
 .cfg-gen-row input[type=range]{flex:1;accent-color:var(--gold);height:6px}
 .cfg-inline-help{font-size:9px;color:var(--dim);line-height:1.5;margin-top:6px}
+.cfg-launch-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+.cfg-outlook{background:#081108;border:1px solid var(--border);border-radius:8px;padding:12px}
+.cfg-outlook-list{display:flex;flex-direction:column;gap:8px}
+.cfg-outlook-row{display:flex;justify-content:space-between;gap:10px;font-size:10px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,.05)}
+.cfg-outlook-row:last-child{border-bottom:none;padding-bottom:0}
+.cfg-outlook-row span:first-child{color:var(--dim)}
+.cfg-provider-summary{font-size:10px;line-height:1.55;color:var(--text)}
+.cfg-provider-summary strong{color:var(--gold)}
 /* Provider grid */
-.cfg-providers{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;max-height:400px;overflow-y:auto;padding-right:4px}
+.cfg-providers{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;max-height:400px;min-height:132px;overflow-y:auto;padding-right:4px;align-content:start}
+.cfg-providers-empty{display:flex;align-items:center;justify-content:center;padding:18px;border:1px dashed rgba(107,143,107,.28);border-radius:8px;font-size:10px;line-height:1.6;color:var(--dim);grid-column:1 / -1;background:#081108}
 .cfg-prov{background:#0a150a;border:1px solid var(--border);border-radius:4px;padding:8px;cursor:pointer;transition:all .2s;user-select:none}
 .cfg-prov:hover{border-color:var(--dim)}
 .cfg-prov.selected{border-color:var(--gold);background:#1a2a0a}
@@ -292,7 +398,10 @@ button:focus-visible,#lang-btn:focus-visible{outline:2px solid var(--gold);outli
 .cfg-prov .cfg-check{width:14px;height:14px;border:1px solid var(--dim);border-radius:2px;display:inline-flex;align-items:center;justify-content:center;font-size:10px;margin-right:2px;color:transparent;flex-shrink:0}
 .cfg-prov.selected .cfg-check{background:var(--gold);border-color:var(--gold);color:#000}
 /* Start button */
-.cfg-footer{padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.cfg-provider-toolbar{display:flex;flex-wrap:wrap;gap:8px}
+.cfg-provider-action{border:1px solid rgba(107,143,107,.22);background:#0b140b;color:var(--text);border-radius:999px;padding:7px 10px;font-size:9px;font-family:inherit;cursor:pointer;letter-spacing:.4px;text-transform:uppercase}
+.cfg-provider-action:hover{border-color:var(--gold);color:var(--gold)}
+.cfg-footer{padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;position:sticky;bottom:0;z-index:2;background:linear-gradient(180deg,rgba(13,26,13,.9),rgba(13,26,13,.98));backdrop-filter:blur(10px)}
 .cfg-footer .cfg-summary{font-size:10px;color:var(--dim)}
 .cfg-footer .cfg-summary strong{color:var(--hp-high)}
 #start-war-btn{background:var(--gold);color:#000;font-family:'Press Start 2P',monospace;font-size:11px;border:none;padding:12px 28px;cursor:pointer;border-radius:3px;letter-spacing:1px;transition:all .2s}
@@ -300,20 +409,22 @@ button:focus-visible,#lang-btn:focus-visible{outline:2px solid var(--gold);outli
 #start-war-btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
 /* === MOBILE RESPONSIVE === */
 @media(max-width:768px){
+  #left-sidebar{display:none}
   #sidebar{display:none}
   #app{flex-direction:column}
   #hud{padding:4px 8px}
+  #mobile-status-strip{display:flex}
   #alive-counter{font-size:10px}
   #gen-counter{font-size:8px}
-  #controls{bottom:8px;left:8px}
+  #controls{bottom:8px;left:8px;right:8px;max-width:none;padding:8px 10px;border-radius:12px;background:rgba(8,16,8,.88);border:1px solid rgba(107,143,107,.24);backdrop-filter:blur(10px)}
   #camera-pad{right:8px;bottom:8px;max-width:150px}
   #controls-meta{flex-basis:100%;margin-bottom:2px}
-  #controls button{font-size:14px;padding:6px 12px;min-width:36px;min-height:36px}
+  #controls button{font-size:14px;padding:6px 12px;min-width:36px;min-height:36px;border-radius:999px}
   #announce-title{font-size:12px}
   #announce-sub{font-size:10px}
   #briefing-panel{position:absolute;top:52px;left:10px;right:10px;width:auto}
   #mission-rail{top:42px;left:10px;right:10px;transform:none;max-width:none}
-  #broadcast-card{top:88px;left:10px;right:10px;transform:none;max-width:none}
+  #broadcast-card{top:88px;left:10px;right:auto;transform:none;width:min(320px,calc(100vw - 20px));max-width:min(320px,calc(100vw - 20px))}
   .broadcast-grid{grid-template-columns:1fr}
   .briefing-status{display:none}
   .doctrine-grid{grid-template-columns:1fr}
@@ -321,13 +432,18 @@ button:focus-visible,#lang-btn:focus-visible{outline:2px solid var(--gold);outli
   .phase-legend{grid-template-columns:1fr}
   .telemetry-grid{grid-template-columns:1fr}
   .cfg-briefing{grid-template-columns:1fr}
+  .cfg-quickstart{grid-template-columns:1fr}
+  .cfg-preset-grid{grid-template-columns:1fr}
   .cfg-ops-grid{grid-template-columns:1fr}
   .cfg-providers{grid-template-columns:repeat(2,1fr)}
   .cfg-box{max-width:98vw}
   .cfg-body{padding:12px}
   .cfg-row{flex-direction:column}
+  .cfg-launch-grid{grid-template-columns:1fr}
   #results{padding:16px}
+  .res-hero-grid{grid-template-columns:1fr}
   .res-grid{grid-template-columns:repeat(2,1fr)}
+  .res-pro-report{grid-template-columns:1fr}
   .res-summary-grid{grid-template-columns:1fr}
   .res-inner{max-width:100%}
 }
@@ -335,10 +451,19 @@ button:focus-visible,#lang-btn:focus-visible{outline:2px solid var(--gold);outli
   .cfg-providers{grid-template-columns:1fr}
   .tier-strip{grid-template-columns:1fr}
   .res-grid{grid-template-columns:1fr}
-  #controls button{font-size:16px;padding:8px 14px}
+  #controls{gap:8px;padding:10px}
+  #controls-meta{display:none}
+  #controls button{font-size:16px;padding:8px 14px;flex:1}
   #camera-pad{display:none}
   #mission-rail{display:none}
-  #broadcast-card{display:none}
+  #broadcast-card{top:48px;left:8px;right:8px;transform:none;max-width:none;padding:10px 12px}
+  .broadcast-title{font-size:9px}
+  .broadcast-metrics{gap:6px}
+  .broadcast-metric{padding:6px 8px}
+  #mobile-status-strip{right:52px}
+  .mobile-status-pill{padding:6px 8px}
+  .res-action-rail{bottom:8px;padding:10px}
+  .res-action-rail .res-action-btn{width:100%}
 }
 /* === ONBOARDING HINT === */
 #hint-overlay{position:absolute;bottom:60px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.85);border:1px solid var(--border);border-radius:6px;padding:10px 18px;z-index:12;pointer-events:none;text-align:center;transition:opacity .6s;font-size:11px;color:var(--text);white-space:nowrap}
@@ -360,11 +485,17 @@ button:focus-visible,#lang-btn:focus-visible{outline:2px solid var(--gold);outli
 </head>
 <body>
 <div id="app">
+  <div id="left-sidebar"></div>
   <div id="canvas-wrap">
     <canvas id="cv" role="img" aria-label="EvoHive battle visualization"></canvas>
     <div id="hud">
       <span id="alive-counter" role="status" aria-live="polite" aria-label="Alive agents count">ALIVE: 60</span>
       <span id="gen-counter" role="status" aria-label="Current generation">GEN 1</span>
+    </div>
+    <div id="mobile-status-strip">
+      <div class="mobile-status-pill"><strong data-i18n="phase">PHASE</strong><span id="mobile-phase-metric">STANDBY</span></div>
+      <div class="mobile-status-pill"><strong data-i18n="runProgress">RUN PROGRESS</strong><span id="mobile-progress-metric">0%</span></div>
+      <div class="mobile-status-pill"><strong data-i18n="apiCalls">API CALLS</strong><span id="mobile-api-metric">0</span></div>
     </div>
     <div id="mission-rail">
       <div class="mission-rail-kicker" data-i18n="currentMission">CURRENT MISSION</div>
@@ -374,10 +505,18 @@ button:focus-visible,#lang-btn:focus-visible{outline:2px solid var(--gold);outli
     <div id="broadcast-card">
       <div class="broadcast-head">
         <div class="broadcast-kicker" data-i18n="spectatorFeed">SPECTATOR FEED</div>
-        <div class="broadcast-tag" id="broadcast-tag" data-i18n="liveUpdate">Live update</div>
+        <div class="broadcast-head-actions">
+          <div class="broadcast-tag" id="broadcast-tag" data-i18n="liveUpdate">Live update</div>
+          <button id="broadcast-toggle" class="broadcast-toggle" type="button" data-i18n="collapseFeed">COLLAPSE</button>
+        </div>
       </div>
       <div class="broadcast-title" id="broadcast-title">Awaiting deployment.</div>
       <div class="broadcast-sub" id="broadcast-sub">Once the run starts, this layer will call out major swings, generation summaries, and champion changes.</div>
+      <div class="broadcast-metrics">
+        <div class="broadcast-metric"><strong data-i18n="phase">PHASE</strong><span id="broadcast-phase-metric">STANDBY</span></div>
+        <div class="broadcast-metric"><strong data-i18n="runProgress">RUN PROGRESS</strong><span id="broadcast-progress-metric">0%</span></div>
+        <div class="broadcast-metric"><strong data-i18n="apiCalls">API CALLS</strong><span id="broadcast-api-metric">0</span></div>
+      </div>
       <div class="broadcast-grid">
         <div class="broadcast-panel">
           <div class="broadcast-panel-label" data-i18n="watchNow">WATCH NOW</div>
@@ -403,6 +542,7 @@ button:focus-visible,#lang-btn:focus-visible{outline:2px solid var(--gold);outli
               <div data-i18n="backendDriven">Backend-driven combat</div>
             </div>
             <div class="briefing-size-group">
+              <button id="briefing-detail-toggle" class="briefing-detail-btn" type="button" data-i18n="showDetails">DETAILS</button>
               <button id="briefing-smaller" class="briefing-size-btn" type="button" aria-label="Make briefing smaller">A-</button>
               <button id="briefing-larger" class="briefing-size-btn" type="button" aria-label="Make briefing larger">A+</button>
             </div>
@@ -410,52 +550,57 @@ button:focus-visible,#lang-btn:focus-visible{outline:2px solid var(--gold);outli
           </div>
         </div>
         <div class="briefing-body">
-          <div class="briefing-copy" data-i18n="doctrineCopy">Each solution is a soldier, each fitness score is battle power, and each evolutionary operator becomes a visible combat event.</div>
-          <div class="briefing-problem">
-            <div class="briefing-problem-label" data-i18n="currentMission">CURRENT MISSION</div>
-            <div class="briefing-problem-text" id="current-problem-text">No mission loaded yet. Configure a problem below and launch the war.</div>
+          <div class="briefing-core">
+            <div class="briefing-problem">
+              <div class="briefing-problem-label" data-i18n="currentMission">CURRENT MISSION</div>
+              <div class="briefing-problem-text" id="current-problem-text">No mission loaded yet. Configure a problem below and launch the war.</div>
+              <div class="briefing-copy-quiet" data-i18n="briefingQuiet">Watch the champion, the live pulse, and the generation jumps. Open details only when you want the full doctrine view.</div>
+            </div>
+            <div class="doctrine-grid">
+              <div class="doctrine-card">
+                <div class="doctrine-label" data-i18n="doctrineUnit">UNIT MODEL</div>
+                <div class="doctrine-value" data-i18n="doctrineUnitValue">Solution = Soldier</div>
+              </div>
+              <div class="doctrine-card">
+                <div class="doctrine-label" data-i18n="doctrinePower">POWER MODEL</div>
+                <div class="doctrine-value" data-i18n="doctrinePowerValue">Fitness = Combat Power</div>
+              </div>
+              <div class="doctrine-card">
+                <div class="doctrine-label" data-i18n="doctrineConflict">CONFLICT MODEL</div>
+                <div class="doctrine-value" data-i18n="doctrineConflictValue">Selection = Battlefield Survival</div>
+              </div>
+            </div>
           </div>
-          <div class="doctrine-grid">
-            <div class="doctrine-card">
-              <div class="doctrine-label" data-i18n="doctrineUnit">UNIT MODEL</div>
-              <div class="doctrine-value" data-i18n="doctrineUnitValue">Solution = Soldier</div>
+          <div class="briefing-deep">
+            <div class="briefing-copy" data-i18n="doctrineCopy">Each solution is a soldier, each fitness score is battle power, and each evolutionary operator becomes a visible combat event.</div>
+            <div class="legend-head">
+              <div class="legend-title" data-i18n="tierDoctrine">TIER DOCTRINE</div>
+              <div class="legend-note" data-i18n="tierDoctrineNote">Power escalates with Elo</div>
             </div>
-            <div class="doctrine-card">
-              <div class="doctrine-label" data-i18n="doctrinePower">POWER MODEL</div>
-              <div class="doctrine-value" data-i18n="doctrinePowerValue">Fitness = Combat Power</div>
+            <div class="tier-strip">
+              <div class="tier-chip"><strong style="color:#8fd18c">T1</strong><span data-i18n="tier1Name">Infantry</span><em data-i18n="tier1Desc">Untested opener</em></div>
+              <div class="tier-chip"><strong style="color:#d7d77a">T2</strong><span data-i18n="tier2Name">Heavy</span><em data-i18n="tier2Desc">Survives first review</em></div>
+              <div class="tier-chip"><strong style="color:#68d8ff">T3</strong><span data-i18n="tier3Name">Mech</span><em data-i18n="tier3Desc">Laser and EMP pressure</em></div>
+              <div class="tier-chip"><strong style="color:#ffb347">T4</strong><span data-i18n="tier4Name">Tank</span><em data-i18n="tier4Desc">Elite orbital force</em></div>
+              <div class="tier-chip"><strong style="color:#ff7de9">T5</strong><span data-i18n="tier5Name">Aircraft</span><em data-i18n="tier5Desc">Top-tier finisher</em></div>
             </div>
-            <div class="doctrine-card">
-              <div class="doctrine-label" data-i18n="doctrineConflict">CONFLICT MODEL</div>
-              <div class="doctrine-value" data-i18n="doctrineConflictValue">Selection = Battlefield Survival</div>
-            </div>
-          </div>
-          <div class="legend-head">
-            <div class="legend-title" data-i18n="tierDoctrine">TIER DOCTRINE</div>
-            <div class="legend-note" data-i18n="tierDoctrineNote">Power escalates with Elo</div>
-          </div>
-          <div class="tier-strip">
-            <div class="tier-chip"><strong style="color:#8fd18c">T1</strong><span data-i18n="tier1Name">Infantry</span><em data-i18n="tier1Desc">Untested opener</em></div>
-            <div class="tier-chip"><strong style="color:#d7d77a">T2</strong><span data-i18n="tier2Name">Heavy</span><em data-i18n="tier2Desc">Survives first review</em></div>
-            <div class="tier-chip"><strong style="color:#68d8ff">T3</strong><span data-i18n="tier3Name">Mech</span><em data-i18n="tier3Desc">Laser and EMP pressure</em></div>
-            <div class="tier-chip"><strong style="color:#ffb347">T4</strong><span data-i18n="tier4Name">Tank</span><em data-i18n="tier4Desc">Elite orbital force</em></div>
-            <div class="tier-chip"><strong style="color:#ff7de9">T5</strong><span data-i18n="tier5Name">Aircraft</span><em data-i18n="tier5Desc">Top-tier finisher</em></div>
-          </div>
-          <div class="phase-legend">
-            <div class="phase-legend-item">
-              <div>01</div>
-              <div><strong data-i18n="phaseLegendEval">Evaluate as scan</strong><span data-i18n="phaseLegendEvalDesc">Assessment becomes shields, grade flashes, and power readouts over each unit.</span></div>
-            </div>
-            <div class="phase-legend-item">
-              <div>02</div>
-              <div><strong data-i18n="phaseLegendElo">Elo as duel</strong><span data-i18n="phaseLegendEloDesc">Swiss rounds become face-to-face skirmishes with winner momentum and retreat arcs.</span></div>
-            </div>
-            <div class="phase-legend-item">
-              <div>03</div>
-              <div><strong data-i18n="phaseLegendCross">Crossover as fusion</strong><span data-i18n="phaseLegendCrossDesc">Parents fire linking beams and a child unit is forged at the center line.</span></div>
-            </div>
-            <div class="phase-legend-item">
-              <div>04</div>
-              <div><strong data-i18n="phaseLegendMutate">Mutation as lightning</strong><span data-i18n="phaseLegendMutateDesc">Random variation becomes chained electricity, shield spikes, and visible tier upgrades.</span></div>
+            <div class="phase-legend">
+              <div class="phase-legend-item">
+                <div>01</div>
+                <div><strong data-i18n="phaseLegendEval">Evaluate as scan</strong><span data-i18n="phaseLegendEvalDesc">Assessment becomes shields, grade flashes, and power readouts over each unit.</span></div>
+              </div>
+              <div class="phase-legend-item">
+                <div>02</div>
+                <div><strong data-i18n="phaseLegendElo">Elo as duel</strong><span data-i18n="phaseLegendEloDesc">Swiss rounds become face-to-face skirmishes with winner momentum and retreat arcs.</span></div>
+              </div>
+              <div class="phase-legend-item">
+                <div>03</div>
+                <div><strong data-i18n="phaseLegendCross">Crossover as fusion</strong><span data-i18n="phaseLegendCrossDesc">Parents fire linking beams and a child unit is forged at the center line.</span></div>
+              </div>
+              <div class="phase-legend-item">
+                <div>04</div>
+                <div><strong data-i18n="phaseLegendMutate">Mutation as lightning</strong><span data-i18n="phaseLegendMutateDesc">Random variation becomes chained electricity, shield spikes, and visible tier upgrades.</span></div>
+              </div>
             </div>
           </div>
         </div>
@@ -545,6 +690,15 @@ button:focus-visible,#lang-btn:focus-visible{outline:2px solid var(--gold);outli
         <div class="telemetry-box"><div class="telemetry-val" id="st-api-calls">0</div><div class="telemetry-lbl" data-i18n="apiCalls">API CALLS</div></div>
       </div>
     </div>
+    <div class="sb-section">
+      <div class="intel-card" id="intel-focus-card">
+        <div class="intel-head">
+          <div class="intel-title" data-i18n="focusIntel">FOCUS INTEL</div>
+          <div class="intel-note" data-i18n="focusHint">Hover or click a unit to lock a live dossier.</div>
+        </div>
+        <div class="intel-stack" id="intel-focus-content"></div>
+      </div>
+    </div>
     <div class="sb-section" id="faction-list">
       <div class="sb-label" data-i18n="factions">FACTIONS</div>
     </div>
@@ -565,6 +719,22 @@ button:focus-visible,#lang-btn:focus-visible{outline:2px solid var(--gold);outli
       <span data-i18n="configSubtitle">Configure your evolution theater</span>
     </div>
     <div class="cfg-body">
+      <div class="cfg-quickstart">
+        <div class="cfg-quick-panel">
+          <div class="cfg-section-head">
+            <div class="cfg-label" data-i18n="launchPresets">LAUNCH PRESETS</div>
+            <div class="cfg-section-note" data-i18n="launchPresetsNote">Pick a battle profile, then fine-tune if needed.</div>
+          </div>
+          <div class="cfg-preset-grid" id="cfg-preset-grid"></div>
+        </div>
+        <div class="cfg-quick-panel">
+          <div class="cfg-section-head">
+            <div class="cfg-label" data-i18n="missionIdeas">MISSION IDEAS</div>
+            <div class="cfg-section-note" data-i18n="missionIdeasNote">Tap one to seed the prompt box with a strong starter.</div>
+          </div>
+          <div class="cfg-prompt-suggestions" id="cfg-prompt-suggestions"></div>
+        </div>
+      </div>
       <div class="cfg-briefing">
         <div class="cfg-brief-panel">
           <div class="cfg-label" data-i18n="configBriefing">MISSION BRIEFING</div>
@@ -631,10 +801,28 @@ button:focus-visible,#lang-btn:focus-visible{outline:2px solid var(--gold);outli
             <div class="cfg-slider-val" id="cfg-gens-val">3</div>
           </div>
           <div class="cfg-inline-help" data-i18n="generationsHelp">Each generation is a full round of evaluation, duels, elimination, crossover, and mutation.</div>
+          <div class="cfg-launch-grid">
+            <div class="cfg-outlook">
+              <div class="cfg-label" data-i18n="launchOutlook">LAUNCH OUTLOOK</div>
+              <div class="cfg-outlook-list" id="cfg-outlook-list"></div>
+            </div>
+            <div class="cfg-outlook">
+              <div class="cfg-label" data-i18n="providerMix">PROVIDER MIX</div>
+              <div class="cfg-provider-summary" id="cfg-provider-summary"></div>
+            </div>
+          </div>
         </div>
       </div>
       <div>
-        <div class="cfg-label">SELECT MODELS / FACTIONS <span style="color:var(--gold)">(min 2)</span></div>
+        <div class="cfg-section-head">
+          <div class="cfg-label">SELECT MODELS / FACTIONS <span style="color:var(--gold)">(min 2)</span></div>
+          <div class="cfg-provider-toolbar" id="cfg-provider-toolbar">
+            <button class="cfg-provider-action" type="button" data-provider-preset="core" data-i18n="providerPresetCore">CORE</button>
+            <button class="cfg-provider-action" type="button" data-provider-preset="frontier" data-i18n="providerPresetFrontier">FRONTIER</button>
+            <button class="cfg-provider-action" type="button" data-provider-preset="cn" data-i18n="providerPresetChina">CN STACK</button>
+            <button class="cfg-provider-action" type="button" data-provider-preset="all" data-i18n="providerPresetAll">ALL</button>
+          </div>
+        </div>
         <div class="cfg-providers" id="cfg-providers"></div>
       </div>
       <div class="cfg-history">
@@ -691,6 +879,7 @@ let currentProgress=0;
 let currentStageLabel='Standby';
 let currentStatusText='Waiting for deployment.';
 let currentRunError='';
+let briefingCompact=true;
 let broadcastHeadline='Awaiting deployment.';
 let broadcastSubline='Once the run starts, this layer will call out major swings, generation summaries, and champion changes.';
 let broadcastSummary='Generation summaries, best fitness jumps, and elimination shocks will be summarized here.';
@@ -698,7 +887,41 @@ let lastChampionKey='';
 const RUN_HISTORY_KEY='evohive-run-history';
 const BRIEFING_STATE_KEY='evohive-briefing-state';
 const BRIEFING_SIZE_KEY='evohive-briefing-size';
+const BROADCAST_STATE_KEY='evohive-broadcast-state';
 const BRIEFING_SIZE_STEPS=[280,370,460,560];
+const LAUNCH_PRESETS=[
+  {id:'scout', total:30, gens:2, mode:'fast', budget:0.3},
+  {id:'balanced', total:60, gens:3, mode:'fast', budget:0.5},
+  {id:'siege', total:100, gens:5, mode:'deep', budget:1.2}
+];
+const PROVIDER_PRESETS={
+  core:['openai','anthropic','gemini','deepseek','groq'],
+  frontier:['openai','anthropic','gemini','deepseek','groq','xai','mistral','perplexity'],
+  cn:['zhipuai','siliconflow','moonshot','dashscope','volcengine','minimax','baichuan','yi'],
+  all:ALL_PROVIDERS.map(provider=>provider.id),
+};
+const PROMPT_SUGGESTIONS=[
+  {
+    id:'gtm',
+    en:'Build a GTM and pricing strategy for an AI coding review product aimed at indie developers.',
+    zh:'为一款面向独立开发者的 AI 代码审查产品制定 GTM 与定价策略。'
+  },
+  {
+    id:'roadmap',
+    en:'Design a 90-day product roadmap for an AI agent startup that needs traction without burning budget.',
+    zh:'为一家需要在控制预算下获得增长的 AI Agent 创业公司设计 90 天产品路线图。'
+  },
+  {
+    id:'ops',
+    en:'Create an operations playbook to improve response quality, latency, and cost for a multi-model AI app.',
+    zh:'为一个多模型 AI 应用制定同时提升质量、延迟和成本效率的运营作战手册。'
+  },
+  {
+    id:'launch',
+    en:'Draft a launch plan and positioning for an open-source developer tool entering a crowded market.',
+    zh:'为一个进入拥挤市场的开源开发者工具撰写发布计划与定位方案。'
+  }
+];
 let FACTIONS=[];
 function buildFactions(){
   FACTIONS=ALL_PROVIDERS.filter(p=>selectedProviders.has(p.id)).map(p=>({id:p.id,name:p.name,color:p.color,soldiers:0}));
@@ -722,6 +945,9 @@ const PHASES=[
 let agents=[],particles=[],floatTexts=[],killfeed=[],battlelog=[];
 let totalKills=0,currentPhase=0,currentGen=1,warStartTime=0;
 let soldierScale=Math.max(.45,100/TOTAL);
+let runActive=false,lastBackendEventAt=0,runWatchdogTimer=null;
+const PROBLEM_SOFT_LIMIT=600;
+const PROBLEM_HARD_LIMIT=2400;
 
 /* ---------- SECTION: I18N ---------- */
 let lang=localStorage.getItem('evohive-lang')||'en';
@@ -808,11 +1034,39 @@ const I18N={
   searchHelp:{en:'Useful for market or current-event questions when search APIs are configured.',zh:'当搜索 API 已配置时，适合市场或时效性问题。'},
   runProgress:{en:'RUN PROGRESS',zh:'运行进度'},
   recentRuns:{en:'RECENT RUNS',zh:'最近运行'},
+  launchPresets:{en:'LAUNCH PRESETS',zh:'快速开战预设'},
+  launchPresetsNote:{en:'Pick a battle profile, then fine-tune if needed.',zh:'先选一个战役档位，再按需微调。'},
+  missionIdeas:{en:'MISSION IDEAS',zh:'任务灵感'},
+  missionIdeasNote:{en:'Tap one to seed the prompt box with a strong starter.',zh:'点一下即可把高质量起手式填进问题框。'},
+  launchOutlook:{en:'LAUNCH OUTLOOK',zh:'开战预估'},
+  providerMix:{en:'PROVIDER MIX',zh:'阵营构成'},
+  estRounds:{en:'EST. DUELS',zh:'预计对战数'},
+  estPressure:{en:'PRESSURE',zh:'压力等级'},
+  estCoverage:{en:'COVERAGE',zh:'覆盖面'},
+  focusIntel:{en:'FOCUS INTEL',zh:'焦点情报'},
+  focusHint:{en:'Hover or click a unit to lock a live dossier.',zh:'悬停或点击一个单位，即可锁定实时档案。'},
+  liveLeader:{en:'LIVE LEADER',zh:'当前冠军'},
+  focusUnit:{en:'FOCUS UNIT',zh:'焦点单位'},
+  noFocus:{en:'No unit selected yet. The champion will be tracked here until you focus another one.',zh:'当前还没有锁定单位。在你聚焦其他单位前，这里会自动追踪冠军。'},
+  focusFaction:{en:'Faction camera locked',zh:'已锁定该阵营视角'},
+  presetScout:{en:'SCOUT RUN',zh:'侦察试跑'},
+  presetScoutDesc:{en:'30 agents · 2 gens · fast mode · lowest cost.',zh:'30 agents · 2 代 · Fast 模式 · 最低成本。'},
+  presetBalanced:{en:'BALANCED WAR',zh:'均衡战役'},
+  presetBalancedDesc:{en:'60 agents · 3 gens · default production mix.',zh:'60 agents · 3 代 · 默认生产配置。'},
+  presetSiege:{en:'SIEGE MODE',zh:'攻坚模式'},
+  presetSiegeDesc:{en:'100 agents · 5 gens · deep mode for harder missions.',zh:'100 agents · 5 代 · Deep 模式，适合更难任务。'},
   loadConfig:{en:'LOAD CONFIG',zh:'载入配置'},
   runAgain:{en:'RUN AGAIN',zh:'再次运行'},
   deleteRun:{en:'DELETE',zh:'删除'},
   hideIntel:{en:'HIDE INTEL',zh:'收起情报栏'},
   openIntel:{en:'OPEN INTEL',zh:'打开情报栏'},
+  collapseFeed:{en:'COLLAPSE',zh:'收起'},
+  expandFeed:{en:'EXPAND',zh:'展开'},
+  providerPresetCore:{en:'CORE',zh:'核心阵营'},
+  providerPresetFrontier:{en:'FRONTIER',zh:'前沿阵营'},
+  providerPresetChina:{en:'CN STACK',zh:'中文阵营'},
+  providerPresetAll:{en:'ALL',zh:'全部'},
+  selectAtLeastTwo:{en:'Select at least 2 factions to start',zh:'至少选择 2 个阵营才能开战'},
   briefingMinimized:{en:'Mission briefing minimized. Drag the header to move it.',zh:'任务简报已折叠。拖动顶部标题栏可以移动它。'},
   makeSmaller:{en:'Shrink panel',zh:'缩小看板'},
   makeLarger:{en:'Enlarge panel',zh:'放大看板'},
@@ -821,6 +1075,22 @@ const I18N={
   actionPlan:{en:'ACTION PLAN',zh:'行动清单'},
   riskWatch:{en:'RISK WATCH',zh:'风险提醒'},
   copyAnswer:{en:'COPY ANSWER',zh:'复制答案'},
+  exportReport:{en:'EXPORT REPORT',zh:'导出报告'},
+  showDetails:{en:'DETAILS',zh:'详情'},
+  hideDetails:{en:'HIDE DETAILS',zh:'收起详情'},
+  briefingQuiet:{en:'Watch the champion, the live pulse, and the generation jumps. Open details only when you want the full doctrine view.',zh:'先看冠军、实时播报和代际跃迁。只有想看完整战争教义时，再展开详情。'},
+  whyChampionWon:{en:'WHY THE CHAMPION WON',zh:'冠军胜出原因'},
+  executiveSummary:{en:'EXECUTIVE SUMMARY',zh:'管理摘要'},
+  recommendedNext:{en:'RECOMMENDED NEXT STEP',zh:'建议下一步'},
+  alternativesLost:{en:'WHY THE OTHERS LOST',zh:'其他方案为什么没赢'},
+  emptyAnswer:{en:'No final long-form answer was returned. Review the telemetry and top fighters below, then retry with a clearer mission or a higher budget if needed.',zh:'当前没有返回最终长文本答案。可以先查看下方遥测和 Top Fighters，再尝试用更清晰的问题或更高预算重新运行。'},
+  copyUnavailable:{en:'Nothing to copy yet',zh:'当前没有可复制的内容'},
+  reportExported:{en:'Run report downloaded',zh:'运行报告已下载'},
+  reportExportFailed:{en:'Unable to export the report in this browser',zh:'当前浏览器无法导出报告'},
+  longProblemHint:{en:'Mission is long. It can still run, but narrowing the scope may improve quality.',zh:'任务较长，仍然可以运行，但适当聚焦问题通常会提升结果质量。'},
+  trimmedProblemHint:{en:'Mission is very long. Extra text will be trimmed before launch.',zh:'任务过长，启动时会自动截断超出部分。'},
+  backendSlow:{en:'Backend is still working. This run is slower than usual, but the battlefield remains synced to real events.',zh:'后端仍在运行中。这次任务比平时更慢，但战场仍会跟随后端真实事件同步。'},
+  finalPackagePending:{en:'Final answer package is still being assembled.',zh:'最终答案包仍在整理中。'},
   runSummary:{en:'RUN SUMMARY',zh:'运行摘要'},
 };
 function t(key){return I18N[key]?.[lang]||key}
@@ -832,6 +1102,8 @@ function updateI18N(){
   const largerBtn=document.getElementById('briefing-larger');
   if(smallerBtn) smallerBtn.setAttribute('aria-label',t('makeSmaller'));
   if(largerBtn) largerBtn.setAttribute('aria-label',t('makeLarger'));
+  const detailBtn=document.getElementById('briefing-detail-toggle');
+  if(detailBtn) detailBtn.textContent=briefingCompact?t('showDetails'):t('hideDetails');
   const miniText=document.getElementById('briefing-mini-text');
   if(miniText) miniText.textContent=t('briefingMinimized');
   const problemEl=document.getElementById('current-problem-text');
@@ -852,6 +1124,10 @@ function updateI18N(){
   if(bTitle) bTitle.textContent=broadcastHeadline;
   if(bSub) bSub.textContent=broadcastSubline;
   if(bSummary) bSummary.textContent=broadcastSummary;
+  const broadcastToggle=document.getElementById('broadcast-toggle');
+  if(broadcastToggle){
+    broadcastToggle.textContent=document.getElementById('broadcast-card')?.classList.contains('collapsed')?t('expandFeed'):t('collapseFeed');
+  }
   localStorage.setItem('evohive-lang',lang);
 }
 function setCurrentProblem(problem){
@@ -872,6 +1148,12 @@ function updateRuntimeStatus(){
   const progressFillEl=document.getElementById('st-progress-fill');
   const progressStageEl=document.getElementById('st-progress-stage');
   const progressStatusEl=document.getElementById('st-progress-status');
+  const broadcastPhaseMetricEl=document.getElementById('broadcast-phase-metric');
+  const broadcastProgressMetricEl=document.getElementById('broadcast-progress-metric');
+  const broadcastApiMetricEl=document.getElementById('broadcast-api-metric');
+  const mobilePhaseMetricEl=document.getElementById('mobile-phase-metric');
+  const mobileProgressMetricEl=document.getElementById('mobile-progress-metric');
+  const mobileApiMetricEl=document.getElementById('mobile-api-metric');
   if(modeEl) modeEl.textContent=String(currentMode||'fast').toUpperCase();
   if(budgetEl) budgetEl.textContent=`$${Number(currentBudget||0).toFixed(1)}`;
   if(searchEl) searchEl.textContent=currentSearch?'ON':'OFF';
@@ -880,6 +1162,12 @@ function updateRuntimeStatus(){
   if(progressFillEl) progressFillEl.style.width=`${Math.max(0,Math.min(100,currentProgress||0))}%`;
   if(progressStageEl) progressStageEl.textContent=currentStageLabel||'Standby';
   if(progressStatusEl) progressStatusEl.textContent=currentStatusText||'Waiting for deployment.';
+  if(broadcastPhaseMetricEl) broadcastPhaseMetricEl.textContent=(currentStageLabel||'Standby').toUpperCase();
+  if(broadcastProgressMetricEl) broadcastProgressMetricEl.textContent=`${Math.max(0,Math.min(100,Math.round(currentProgress||0)))}%`;
+  if(broadcastApiMetricEl) broadcastApiMetricEl.textContent=String(currentApiCalls||0);
+  if(mobilePhaseMetricEl) mobilePhaseMetricEl.textContent=(currentStageLabel||'Standby').toUpperCase();
+  if(mobileProgressMetricEl) mobileProgressMetricEl.textContent=`${Math.max(0,Math.min(100,Math.round(currentProgress||0)))}%`;
+  if(mobileApiMetricEl) mobileApiMetricEl.textContent=String(currentApiCalls||0);
   const progressCard=document.querySelector('.progress-card');
   if(progressCard) progressCard.classList.toggle('error',!!currentRunError);
 }
@@ -943,6 +1231,54 @@ function renderRunHistory(){
       </div>
     </div>
   `).join('');
+}
+
+function renderLaunchPresets(){
+  const el=document.getElementById('cfg-preset-grid');
+  if(!el) return;
+  const presetText={
+    scout:{title:t('presetScout'),desc:t('presetScoutDesc')},
+    balanced:{title:t('presetBalanced'),desc:t('presetBalancedDesc')},
+    siege:{title:t('presetSiege'),desc:t('presetSiegeDesc')},
+  };
+  el.innerHTML=LAUNCH_PRESETS.map(preset=>`
+    <button class="cfg-preset" type="button" data-launch-preset="${preset.id}">
+      <strong>${presetText[preset.id]?.title||preset.id.toUpperCase()}</strong>
+      <span>${presetText[preset.id]?.desc||''}</span>
+    </button>
+  `).join('');
+}
+
+function renderPromptSuggestions(){
+  const el=document.getElementById('cfg-prompt-suggestions');
+  if(!el) return;
+  el.innerHTML=PROMPT_SUGGESTIONS.map(prompt=>`
+    <button class="cfg-suggestion" type="button" data-prompt-suggestion="${prompt.id}">${escapeHtml(prompt[lang]||prompt.en)}</button>
+  `).join('');
+}
+
+function renderConfigInsights(){
+  const outlookEl=document.getElementById('cfg-outlook-list');
+  const providerSummaryEl=document.getElementById('cfg-provider-summary');
+  if(!outlookEl||!providerSummaryEl) return;
+  const total=Number(document.getElementById('cfg-agents')?.value||TOTAL||60);
+  const gens=Number(document.getElementById('cfg-gens')?.value||GENS||3);
+  const budget=Math.max(0.1,Number(document.getElementById('cfg-budget')?.value||currentBudget||0.5));
+  const providerCount=Math.max(1,selectedProviders.size);
+  const duelEstimate=Math.round(total*Math.max(1,Math.log2(Math.max(2,total)))*gens*0.45);
+  const costPressure=budget<0.5?(lang==='zh'?'轻量':'Light'):budget<1.2?(lang==='zh'?'均衡':'Balanced'):(lang==='zh'?'重火力':'Heavy');
+  const coverage=providerCount<=3?(lang==='zh'?'聚焦':'Focused'):providerCount<=7?(lang==='zh'?'均衡':'Balanced'):(lang==='zh'?'广覆盖':'Broad');
+  outlookEl.innerHTML=`
+    <div class="cfg-outlook-row"><span>${t('estRounds')}</span><strong>${duelEstimate}</strong></div>
+    <div class="cfg-outlook-row"><span>${t('estPressure')}</span><strong>${costPressure}</strong></div>
+    <div class="cfg-outlook-row"><span>${t('estCoverage')}</span><strong>${coverage}</strong></div>
+  `;
+  const selectedList=ALL_PROVIDERS.filter(provider=>selectedProviders.has(provider.id));
+  const previewNames=selectedList.slice(0,5).map(provider=>escapeHtml(provider.name)).join(', ');
+  const overflow=Math.max(0,selectedList.length-5);
+  providerSummaryEl.innerHTML=selectedList.length
+    ? `<strong>${selectedList.length}</strong> ${lang==='zh'?'个阵营已加入战场。':'factions are on deck.'}<br>${previewNames}${overflow?` ${lang==='zh'?'等':'and'} +${overflow}`:''}`
+    : (lang==='zh'?'还没有选择阵营。':'No factions selected yet.');
 }
 
 /* ---------- SECTION: CANVAS & RESIZE ---------- */
@@ -1090,122 +1426,205 @@ function getTier(a){
   return 1;
 }
 
-function drawSoldier(x,y,color,tier,sc,alive,facing,selected){
-  const s=sc*soldierScale;
-  if(!alive){ctx.globalAlpha=.3;}
-  // shadow
-  ctx.fillStyle='rgba(0,0,0,.3)';
-  ctx.beginPath();ctx.ellipse(x,y+2*s,6*s,2*s,0,0,Math.PI*2);ctx.fill();
-
-  if(tier<=2){
-    // T1/T2: humanoid soldier
-    const armorW=tier===2?1.3:1;
-    // legs
-    ctx.fillStyle=darken(color,.5);
-    ctx.fillRect(x-3*s,y-2*s,2*s,4*s);
-    ctx.fillRect(x+1*s,y-2*s,2*s,4*s);
-    // body
-    ctx.fillStyle=color;
-    ctx.fillRect(x-4*s*armorW,y-10*s,8*s*armorW,8*s);
-    // head
-    ctx.fillStyle='#deb887';
-    ctx.fillRect(x-2*s,y-14*s,4*s,4*s);
-    // helmet
-    ctx.fillStyle=tier===2?darken(color,.7):darken(color,.8);
-    ctx.fillRect(x-3*s,y-16*s,6*s,3*s);
-    if(tier===2){
-      // shoulder pads
-      ctx.fillStyle=darken(color,.6);
-      ctx.fillRect(x-6*s,y-10*s,2*s,4*s);
-      ctx.fillRect(x+4*s,y-10*s,2*s,4*s);
-      // visor
-      ctx.fillStyle='#ff4444';
-      ctx.fillRect(x-1*s,y-14*s,3*s,1*s);
-    }
-    // weapon
-    ctx.fillStyle='#888';
-    if(facing>0) ctx.fillRect(x+4*s*armorW,y-8*s,6*s,1.5*s);
-    else ctx.fillRect(x-10*s*armorW,y-8*s,6*s,1.5*s);
-  } else if(tier===3){
-    // T3: mech
-    // legs (thicker)
-    ctx.fillStyle=darken(color,.4);
-    ctx.fillRect(x-4*s,y-3*s,3*s,6*s);
-    ctx.fillRect(x+1*s,y-3*s,3*s,6*s);
-    // body (box)
-    ctx.fillStyle=color;
-    ctx.fillRect(x-5*s,y-12*s,10*s,10*s);
-    // cockpit
-    ctx.fillStyle='#00ff41';
-    ctx.fillRect(x-2*s,y-10*s,4*s,3*s);
-    // antenna
-    ctx.fillStyle='#ccc';
-    ctx.fillRect(x+3*s,y-16*s,1*s,4*s);
-    ctx.fillStyle='#ff0';
-    ctx.fillRect(x+2.5*s,y-17*s,2*s,2*s);
-    // arms/guns
-    ctx.fillStyle='#888';
-    ctx.fillRect(x-9*s,y-10*s,4*s,2*s);
-    ctx.fillRect(x+5*s,y-10*s,4*s,2*s);
-  } else if(tier===4){
-    // T4: tank
-    // treads
-    ctx.fillStyle='#333';
-    ctx.fillRect(x-8*s,y-2*s,16*s,4*s);
-    ctx.fillStyle='#555';
-    for(let i=0;i<4;i++) ctx.fillRect(x-7*s+i*4*s,y-1*s,2*s,2*s);
-    // hull
-    ctx.fillStyle=color;
+function getFactionMotif(agent){
+  const motifs=[
+    {helmet:'crest',shield:'stripe',accent:'#f6d365'},
+    {helmet:'horn',shield:'cross',accent:'#ffb86b'},
+    {helmet:'feather',shield:'dot',accent:'#8be9fd'},
+    {helmet:'tall',shield:'chevron',accent:'#c4b5fd'},
+    {helmet:'wing',shield:'sun',accent:'#fda4af'},
+    {helmet:'leaf',shield:'split',accent:'#86efac'}
+  ];
+  return motifs[(agent?.faction||0)%motifs.length];
+}
+function drawFactionShield(cx,cy,r,motif,base,trim){
+  ctx.fillStyle='#dbc89f';
+  ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle=base;
+  ctx.beginPath();ctx.arc(cx,cy,r*.78,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle=trim;
+  if(motif==='stripe'){
+    ctx.fillRect(cx-r*.18,cy-r*.7,r*.36,r*1.4);
+  }else if(motif==='cross'){
+    ctx.fillRect(cx-r*.18,cy-r*.72,r*.36,r*1.44);
+    ctx.fillRect(cx-r*.72,cy-r*.18,r*1.44,r*.36);
+  }else if(motif==='dot'){
+    ctx.beginPath();ctx.arc(cx,cy,r*.24,0,Math.PI*2);ctx.fill();
+  }else if(motif==='chevron'){
     ctx.beginPath();
-    ctx.moveTo(x-7*s,y-3*s);ctx.lineTo(x-5*s,y-10*s);ctx.lineTo(x+5*s,y-10*s);
-    ctx.lineTo(x+7*s,y-3*s);ctx.closePath();ctx.fill();
-    // turret
-    ctx.fillStyle=darken(color,.7);
-    ctx.fillRect(x-3*s,y-13*s,6*s,4*s);
-    // barrel
-    ctx.fillStyle='#888';
-    const bx=facing>0?3*s:-9*s;
-    ctx.fillRect(x+bx,y-12*s,8*s,2*s);
-  } else {
-    // T5: drone/aircraft
-    // hover glow
-    ctx.fillStyle=color+'44';
-    ctx.beginPath();ctx.ellipse(x,y+1*s,8*s,3*s,0,0,Math.PI*2);ctx.fill();
-    // body (diamond)
-    ctx.fillStyle=color;
-    ctx.beginPath();
-    ctx.moveTo(x,y-14*s);ctx.lineTo(x+7*s,y-7*s);ctx.lineTo(x,y);ctx.lineTo(x-7*s,y-7*s);
-    ctx.closePath();ctx.fill();
-    // wings
-    ctx.fillStyle=darken(color,.6);
-    ctx.beginPath();
-    ctx.moveTo(x-7*s,y-7*s);ctx.lineTo(x-12*s,y-4*s);ctx.lineTo(x-4*s,y-4*s);ctx.closePath();ctx.fill();
-    ctx.beginPath();
-    ctx.moveTo(x+7*s,y-7*s);ctx.lineTo(x+12*s,y-4*s);ctx.lineTo(x+4*s,y-4*s);ctx.closePath();ctx.fill();
-    // cockpit
-    ctx.fillStyle='#00ffff88';
-    ctx.beginPath();ctx.ellipse(x,y-8*s,2*s,3*s,0,0,Math.PI*2);ctx.fill();
-    // thrusters
-    const pulse=Math.sin(Date.now()*.01)*s;
-    ctx.fillStyle='#ff6600';
-    ctx.beginPath();ctx.ellipse(x-3*s,y+pulse,1.5*s,1.5*s,0,0,Math.PI*2);ctx.fill();
-    ctx.beginPath();ctx.ellipse(x+3*s,y+pulse,1.5*s,1.5*s,0,0,Math.PI*2);ctx.fill();
+    ctx.moveTo(cx-r*.45,cy-r*.15);ctx.lineTo(cx,cy+r*.35);ctx.lineTo(cx+r*.45,cy-r*.15);ctx.lineTo(cx+r*.2,cy-r*.15);ctx.lineTo(cx,cy+r*.08);ctx.lineTo(cx-r*.2,cy-r*.15);ctx.closePath();ctx.fill();
+  }else if(motif==='sun'){
+    ctx.beginPath();ctx.arc(cx,cy,r*.2,0,Math.PI*2);ctx.fill();
+    for(let i=0;i<4;i++) ctx.fillRect(cx-r*.06+(i<2?(i*0):0),cy-r*.58+i*(r*.35),r*.12,r*.18);
+    for(let i=0;i<4;i++) ctx.fillRect(cx-r*.58+i*(r*.35),cy-r*.06,r*.18,r*.12);
+  }else if(motif==='split'){
+    ctx.beginPath();ctx.moveTo(cx,cy-r*.72);ctx.lineTo(cx+r*.72,cy);ctx.lineTo(cx,cy+r*.72);ctx.lineTo(cx,cy-r*.72);ctx.closePath();ctx.fill();
   }
+}
+function drawHelmetAccent(x,y,s,motif,accent){
+  ctx.fillStyle=accent;
+  if(motif==='crest') ctx.fillRect(x-.9*s,y-20.8*s,1.8*s,3.3*s);
+  else if(motif==='horn'){ ctx.fillRect(x-3.8*s,y-17.5*s,1.1*s,1.8*s); ctx.fillRect(x+2.7*s,y-17.5*s,1.1*s,1.8*s); }
+  else if(motif==='feather') ctx.fillRect(x-.7*s,y-21.2*s,1.4*s,3.8*s);
+  else if(motif==='tall') ctx.fillRect(x-1*s,y-21.8*s,2*s,4.2*s);
+  else if(motif==='wing'){ ctx.fillRect(x-3.6*s,y-18.4*s,1*s,2.4*s); ctx.fillRect(x+2.6*s,y-18.4*s,1*s,2.4*s); }
+  else if(motif==='leaf') ctx.fillRect(x-.8*s,y-20.6*s,1.6*s,3*s);
+}
+function drawWeaponShape(agent,handX,handY,swordLen,s,tier,attackSwing,trim,steel){
+  ctx.save();
+  ctx.translate(handX,handY);
+  ctx.rotate(-0.28+attackSwing);
+  ctx.fillStyle='#7a5a35';
+  if(tier===1){
+    ctx.fillRect(0,-.45*s,2.4*s,.9*s);
+    ctx.fillStyle=trim;ctx.fillRect(1.4*s,-1.2*s,.5*s,2.4*s);
+    ctx.fillStyle=steel;ctx.fillRect(2.2*s,-.5*s,swordLen,1*s);
+    ctx.fillStyle='#efe7cf';ctx.beginPath();ctx.moveTo(2.2*s+swordLen,-.5*s);ctx.lineTo(3.2*s+swordLen,0);ctx.lineTo(2.2*s+swordLen,.5*s);ctx.closePath();ctx.fill();
+  }else if(tier===2){
+    ctx.fillRect(0,-.5*s,2.6*s,1*s);
+    ctx.fillStyle=trim;ctx.fillRect(1.5*s,-1.4*s,.6*s,2.8*s);
+    ctx.fillStyle=steel;ctx.fillRect(2.4*s,-.35*s,swordLen*.45,.7*s);
+    ctx.beginPath();ctx.moveTo(2.4*s+swordLen*.45,-1.9*s);ctx.lineTo(5.1*s+swordLen*.45,-.1*s);ctx.lineTo(2.4*s+swordLen*.45,1.7*s);ctx.closePath();ctx.fill();
+  }else if(tier===3){
+    ctx.fillRect(0,-.35*s,2.2*s,.7*s);
+    ctx.fillStyle=trim;ctx.fillRect(1.2*s,-1.1*s,.45*s,2.2*s);
+    ctx.fillStyle=steel;ctx.fillRect(1.9*s,-.18*s,swordLen*1.15,.36*s);
+    ctx.beginPath();ctx.moveTo(1.9*s+swordLen*1.15,-.8*s);ctx.lineTo(3.6*s+swordLen*1.15,0);ctx.lineTo(1.9*s+swordLen*1.15,.8*s);ctx.closePath();ctx.fill();
+  }else if(tier===4){
+    ctx.fillRect(0,-.6*s,2.8*s,1.2*s);
+    ctx.fillStyle=trim;ctx.fillRect(1.9*s,-1.6*s,.7*s,3.2*s);
+    ctx.fillStyle=steel;ctx.fillRect(2.5*s,-.8*s,swordLen*.88,1.6*s);
+    ctx.fillStyle='#efe7cf';ctx.beginPath();ctx.moveTo(2.5*s+swordLen*.88,-.8*s);ctx.lineTo(4*s+swordLen*.88,0);ctx.lineTo(2.5*s+swordLen*.88,.8*s);ctx.closePath();ctx.fill();
+  }else{
+    ctx.fillRect(0,-.35*s,2.1*s,.7*s);
+    ctx.fillStyle=trim;ctx.fillRect(1.2*s,-1.2*s,.5*s,2.4*s);
+    ctx.fillStyle=steel;ctx.fillRect(1.8*s,-.2*s,swordLen*1.2,.4*s);
+    ctx.fillRect(1.8*s+swordLen*.7,-1.5*s,.45*s,3*s);
+    ctx.beginPath();ctx.moveTo(1.8*s+swordLen*1.2,-1.1*s);ctx.lineTo(3.7*s+swordLen*1.2,0);ctx.lineTo(1.8*s+swordLen*1.2,1.1*s);ctx.closePath();ctx.fill();
+  }
+  ctx.restore();
+}
+function drawSoldier(x,y,color,tier,sc,alive,facing,selected,agent){
+  const s=sc*soldierScale;
+  const dir=facing>=0?1:-1;
+  const skin='#e6c69f';
+  const armor=darken(color,.78);
+  const under=darken(color,.45);
+  const trim=tier>=4?'#ffd34d':tier===3?'#c8f5ff':'#d8d1b0';
+  const steel=tier>=3?'#c6d0da':'#93989f';
+  const cape=tier>=4?darken(color,.4):darken(color,.58);
+  const motif=getFactionMotif(agent);
+  const accent=motif.accent;
+  const now=performance.now();
+  const movePulse=(agent?.motion||0)>.02?Math.sin((agent?.walkCycle||0)*5.4 + (agent?.id||0)*0.6):0;
+  const walkLift=movePulse*0.8*s;
+  const bodyBob=Math.abs(movePulse)*0.9*s;
+  const attackProgress=agent?.swingUntil&&agent.swingUntil>now?1-((agent.swingUntil-now)/220):0;
+  const blockProgress=agent?.blockUntil&&agent.blockUntil>now?1-((agent.blockUntil-now)/160):0;
+  const hitProgress=agent?.hitUntil&&agent.hitUntil>now?1-((agent.hitUntil-now)/180):0;
+  const attackSwing=Math.sin(attackProgress*Math.PI)*(dir>0?-0.9:0.9);
+  const shieldTilt=Math.sin(Math.max(attackProgress,blockProgress)*Math.PI)*0.18;
+  const recoil=(-agent?.hitFrom||0)*Math.sin(hitProgress*Math.PI)*1.6*s;
+  if(!alive) ctx.globalAlpha=.3;
+
+  ctx.save();
+  ctx.translate(x+recoil,y-bodyBob);
+  ctx.scale(dir,1);
+
+  const headR=(tier>=4?4.1:tier===3?3.8:tier===2?3.5:3.2)*s;
+  const bodyW=(tier>=4?11.2:tier===3?10:tier===2?9:8)*s;
+  const bodyH=(tier>=4?10.4:tier===3?9.4:tier===2?8.8:8)*s;
+  const shieldR=(tier>=4?3.7:tier===3?3.2:tier===2?2.8:2.4)*s;
+  const swordLen=(tier>=4?9.5:tier===3?8.4:7.2)*s;
+
+  function circle(cx,cy,r,fill){
+    ctx.fillStyle=fill;
+    ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.fill();
+  }
+
+  ctx.fillStyle='rgba(0,0,0,.28)';
+  ctx.beginPath();ctx.ellipse(0,2*s,6.8*s,2.4*s,0,0,Math.PI*2);ctx.fill();
+  if(tier>=5){
+    ctx.fillStyle=color+'22';
+    ctx.beginPath();ctx.ellipse(0,0,10*s,3.4*s,0,0,Math.PI*2);ctx.fill();
+  }
+
+  if(tier>=4){
+    ctx.fillStyle=cape;
+    ctx.fillRect(-6.2*s,-9.5*s,3.2*s,10*s);
+    if(tier>=5) ctx.fillRect(-7.4*s,-8.6*s,2.2*s,9*s);
+  }
+
+  ctx.fillStyle=under;
+  ctx.fillRect(-3.2*s,-2*s+Math.max(0,movePulse)*.6*s,2.1*s,(tier>=4?5.8:4.8)*s);
+  ctx.fillRect(1.1*s,-2*s+Math.max(0,-movePulse)*.6*s,2.1*s,(tier>=4?5.8:4.8)*s);
+  ctx.fillStyle=steel;
+  ctx.fillRect(-3.5*s,2.2*s+Math.max(0,movePulse)*.5*s,2.6*s,1.5*s);
+  ctx.fillRect(0.8*s,2.2*s+Math.max(0,-movePulse)*.5*s,2.6*s,1.5*s);
+
+  ctx.fillStyle=color;
+  ctx.fillRect(-bodyW/2,-10.7*s,bodyW,bodyH);
+  ctx.fillStyle=armor;
+  ctx.fillRect(-bodyW/2-1.2*s,-10.4*s,1.7*s,bodyH*.6);
+  ctx.fillRect(bodyW/2-.5*s,-10.4*s,1.7*s,bodyH*.6);
+  if(tier>=3){
+    ctx.fillStyle=trim;
+    ctx.fillRect(-2*s,-9.2*s,4*s,2.2*s);
+  }
+
+  circle(0,-14.2*s,headR,skin);
+  ctx.fillStyle=armor;
+  ctx.beginPath();
+  ctx.roundRect(-headR*1.18,-17.6*s,headR*2.36,headR*1.32,2.2*s);
+  ctx.fill();
+  ctx.fillRect(-headR*1.28,-16.3*s,headR*2.56,headR*.56);
+  ctx.fillRect(-headR*.95,-17.95*s,headR*1.9,1.1*s);
+  drawHelmetAccent(0,0,s,motif.helmet,accent);
+  ctx.fillStyle=tier>=4?'#ffeaa0':tier===3?'#ff7b7b':'#4a3f2e';
+  ctx.fillRect(-1.3*s,-14.8*s,2.6*s,.95*s);
+  if(tier>=4){
+    ctx.fillStyle='#fff4b0';
+    ctx.fillRect(-.65*s,-13.9*s,1.3*s,.65*s);
+  }
+
+  ctx.save();
+  ctx.translate(-7.1*s,-8.2*s);
+  ctx.rotate(-0.1-shieldTilt);
+  drawFactionShield(0,0,shieldR,motif.shield,tier>=2?armor:darken(color,.6),trim);
+  ctx.restore();
+  ctx.fillStyle='#a18458';
+  ctx.fillRect(-8.4*s,-10*s,1.2*s,8.6*s);
+
+  drawWeaponShape(agent,4.2*s,-8.2*s,swordLen,s,tier,attackSwing + (blockProgress?0.18:0),trim,steel);
+
+  if(tier>=3){
+    ctx.fillStyle=trim;
+    ctx.fillRect(-bodyW/2+1.1*s,-5.2*s,bodyW-2.2*s,.8*s);
+  }
+  if(tier>=4){
+    ctx.fillStyle=color+'66';
+    ctx.beginPath();ctx.ellipse(0,-13*s,10*s,4*s,0,0,Math.PI*2);ctx.fill();
+  }
+  if(tier>=5){
+    ctx.fillStyle='#fff4b8';
+    ctx.fillRect(2.4*s,-12.6*s,1*s,1.8*s);
+    ctx.fillRect(-3.4*s,-12.6*s,1*s,1.8*s);
+  }
+
+  ctx.restore();
 
   if(!alive){ctx.globalAlpha=1;return;}
 
-  // color indicator dot (pulsing)
   const dotR=3*sc;
   const pulse2=.5+.5*Math.sin(Date.now()*.005+x);
   ctx.fillStyle=color;
   ctx.globalAlpha=.5+.4*pulse2;
-  ctx.beginPath();ctx.arc(x,y-18*s,dotR,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(x,y-21*s-bodyBob,dotR,0,Math.PI*2);ctx.fill();
   ctx.globalAlpha=1;
 
-  // selection ring
   if(selected){
     ctx.strokeStyle=color;ctx.lineWidth=2;
-    ctx.beginPath();ctx.ellipse(x,y+1*s,8*s,3*s,0,0,Math.PI*2);ctx.stroke();
+    ctx.beginPath();ctx.ellipse(x,y+1*s,8.5*s,3.1*s,0,0,Math.PI*2);ctx.stroke();
   }
 }
 
@@ -1266,6 +1685,7 @@ function makeAgent(id,factionIdx){
     facing:Math.random()>.5?1:-1,
     chute:true,chuteY:-200-Math.random()*300,
     targetGx:0,targetGy:0,
+    walkCycle:Math.random()*6,motion:0,swingUntil:0,blockUntil:0,hitUntil:0,hitFrom:0,lastAttackSide:1,
     prevRank:999,rank:999,rankChanged:0
   };
 }
@@ -1314,6 +1734,30 @@ function addBattleLog(msg){
   const secs=((Date.now()-warStartTime)/1000%60)|0;
   battlelog.unshift({msg,time:`${mins}:${String(secs).padStart(2,'0')}`});
   if(battlelog.length>50) battlelog.pop();
+}
+function focusCameraOnAgent(agent, zoom){
+  if(!agent) return;
+  const nextZoom=Math.max(1,Math.min(2.8,zoom||1.55));
+  const iso=toIso(agent.gx,agent.gy);
+  camTargetZoom=nextZoom;
+  camTargetX=-(iso.x)*baseScale*nextZoom;
+  camTargetY=-(iso.y)*baseScale*nextZoom;
+  clampPan();
+}
+function getAgentAtPoint(mx,my){
+  let found=null;
+  let bestDist=Infinity;
+  for(const agent of agents){
+    if(!agent.alive) continue;
+    const screen=toScreen(agent.gx,agent.gy);
+    const radius=14*baseScale*camZoom*soldierScale;
+    const dist=Math.hypot(mx-screen.x,my-screen.y);
+    if(dist<radius&&dist<bestDist){
+      found=agent;
+      bestDist=dist;
+    }
+  }
+  return found;
 }
 function updateParticles(){
   let writeIdx=0;
@@ -1395,11 +1839,26 @@ function clampPan(){
 }
 // Mouse drag pan
 let wasDragged=false;
+let hoveredAgent=null;
 cvCam.addEventListener('mouseenter',()=>{
   if(!dragging) cvCam.style.cursor='grab';
 });
 cvCam.addEventListener('mouseleave',()=>{
+  hoveredAgent=null;
   if(!dragging) cvCam.style.cursor='default';
+  updateSidebar();
+});
+cvCam.addEventListener('mousemove',e=>{
+  if(dragging) return;
+  const rect=cvCam.getBoundingClientRect();
+  const mx=e.clientX-rect.left;
+  const my=e.clientY-rect.top;
+  const nextHover=getAgentAtPoint(mx,my);
+  if(nextHover!==hoveredAgent){
+    hoveredAgent=nextHover;
+    cvCam.style.cursor=hoveredAgent?'pointer':'grab';
+    updateSidebar();
+  }
 });
 cvCam.addEventListener('mousedown',e=>{
   dragging=true;wasDragged=false;dragStartX=e.clientX;dragStartY=e.clientY;
@@ -1639,6 +2098,16 @@ function updatePhaseTimeline(){
     return `<div class="pt-dot ${cls}" title="${label}"></div>`;
   }).join('');
 }
+function getCurrentChampion(){
+  return aliveAgents().sort((a,b)=>b.elo-a.elo)[0]||null;
+}
+function getIntelTarget(){
+  const selectedOk=selectedAgent&&selectedAgent.alive?selectedAgent:null;
+  const hoveredOk=hoveredAgent&&hoveredAgent.alive?hoveredAgent:null;
+  if(selectedAgent&&!selectedOk) selectedAgent=null;
+  if(hoveredAgent&&!hoveredOk) hoveredAgent=null;
+  return selectedOk||hoveredOk||getCurrentChampion();
+}
 let _sidebarDirty=false;let _sidebarTimer=null;
 function updateSidebar(){
   // Debounce: batch rapid calls into one DOM update per frame
@@ -1653,6 +2122,8 @@ function updateSidebar(){
 }
 function _updateSidebarNow(){
   const alive=aliveAgents();
+  const champion=getCurrentChampion();
+  const intelTarget=getIntelTarget();
   updateRuntimeStatus();
   updateChampionBroadcast();
   document.getElementById('st-alive').textContent=alive.length;
@@ -1689,6 +2160,33 @@ function _updateSidebarNow(){
   bl.innerHTML=battlelog.slice(0,20).map(b=>
     `<div class="bl-entry">[${b.time}] <span>${b.msg}</span></div>`
   ).join('');
+  const intelEl=document.getElementById('intel-focus-content');
+  if(intelEl){
+    const leaderHtml=champion?`
+      <div class="intel-pane">
+        <strong>${t('liveLeader')} · ${escapeHtml(champion.factionName)} #${champion.id}</strong>
+        <span>ELO ${Math.round(champion.elo||0)} · T${getTier(champion)} · HP ${Math.round(champion.hp||100)}%</span>
+      </div>
+    `:`
+      <div class="intel-pane">
+        <strong>${t('liveLeader')}</strong>
+        <span>${lang==='zh'?'当前还没有活跃冠军。':'No active champion yet.'}</span>
+      </div>
+    `;
+    const focusHtml=intelTarget?`
+      <div class="intel-pane">
+        <strong>${t('focusUnit')} · ${escapeHtml(intelTarget.factionName)} #${intelTarget.id}</strong>
+        <span>ELO ${Math.round(intelTarget.elo||0)} · ${intelTarget.kills||0} kills · GEN ${intelTarget.gen||currentGen}</span>
+      </div>
+      <div class="intel-mini-grid">
+        <div class="intel-mini"><strong>${lang==='zh'?'可行性':'Feasibility'}</strong><span>${Number(intelTarget.fitness?.feasibility||0).toFixed(1)}</span></div>
+        <div class="intel-mini"><strong>${lang==='zh'?'创新性':'Innovation'}</strong><span>${Number(intelTarget.fitness?.innovation||0).toFixed(1)}</span></div>
+        <div class="intel-mini"><strong>${lang==='zh'?'具体性':'Specificity'}</strong><span>${Number(intelTarget.fitness?.specificity||0).toFixed(1)}</span></div>
+        <div class="intel-mini"><strong>${lang==='zh'?'成本':'Cost'}</strong><span>${Number(intelTarget.fitness?.cost||0).toFixed(1)}</span></div>
+      </div>
+    `:`<div class="intel-empty">${t('noFocus')}</div>`;
+    intelEl.innerHTML=`${leaderHtml}${focusHtml}`;
+  }
   updatePhaseTimeline();
 }
 
@@ -1757,9 +2255,18 @@ function drawVS(a1,a2){
 }
 
 function drawProjectile(from,to,color){
+  const angle=Math.atan2(to.y-from.y,to.x-from.x);
+  const len=Math.hypot(to.x-from.x,to.y-from.y);
+  ctx.save();
+  ctx.translate(from.x,from.y);
+  ctx.rotate(angle);
   ctx.strokeStyle=color;ctx.lineWidth=2;
-  ctx.beginPath();ctx.moveTo(from.x,from.y);ctx.lineTo(to.x,to.y);ctx.stroke();
-  ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(to.x,to.y,3,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(Math.max(0,len-8),0);ctx.stroke();
+  ctx.fillStyle='#d8d8d8';
+  ctx.fillRect(0,-1.2,7,2.4);
+  ctx.beginPath();ctx.moveTo(len-8,-2.4);ctx.lineTo(len,0);ctx.lineTo(len-8,2.4);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#7a5a35';ctx.fillRect(-3,-1,3,2);
+  ctx.restore();
   ctx.lineWidth=1;
 }
 
@@ -1935,6 +2442,43 @@ function drawAura(x,y,color,tier,sc){
   ctx.restore();
 }
 
+function drawAgentFocusOverlay(agent,isSelected){
+  if(!agent||!agent.alive) return;
+  const s=toScreen(agent.gx,agent.gy);
+  const sc=baseScale*camZoom*soldierScale;
+  const ringR=(isSelected?14:11)*sc;
+  ctx.save();
+  ctx.strokeStyle=isSelected?agent.color:'#f7efb7';
+  ctx.lineWidth=isSelected?2.4:1.6;
+  ctx.globalAlpha=isSelected?0.95:0.72;
+  ctx.beginPath();
+  ctx.arc(s.x,s.y-4*sc,ringR,0,Math.PI*2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(s.x,s.y-4*sc,ringR+5*sc,Math.PI*.1,Math.PI*.55);
+  ctx.stroke();
+  const label=`${agent.factionName} #${agent.id} · T${getTier(agent)} · ELO ${Math.round(agent.elo||0)}`;
+  ctx.font=`${Math.max(8,8*sc)}px 'Share Tech Mono'`;
+  const padding=6*sc;
+  const labelW=ctx.measureText(label).width+padding*2;
+  const labelH=16*sc;
+  const lx=Math.max(10,Math.min(W-labelW-10,s.x-labelW/2));
+  const ly=Math.max(10,s.y-34*sc-labelH);
+  ctx.fillStyle=isSelected?'rgba(7,14,10,.92)':'rgba(7,14,10,.82)';
+  ctx.strokeStyle=isSelected?agent.color:'rgba(247,239,183,.4)';
+  ctx.lineWidth=1;
+  ctx.beginPath();
+  ctx.roundRect(lx,ly,labelW,labelH,6);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle=isSelected?agent.color:'#f7efb7';
+  ctx.textAlign='center';
+  ctx.textBaseline='middle';
+  ctx.fillText(label,lx+labelW/2,ly+labelH/2+1);
+  ctx.restore();
+  ctx.textBaseline='alphabetic';
+}
+
 // Update and draw active effects
 function updateAndDrawEffects(){
   let writeIdx=0;
@@ -1955,6 +2499,11 @@ function updateAndDrawEffects(){
 
 // Launch a tier-appropriate attack effect between attacker and target screen coords
 function launchAttack(attacker,target,attackerScreen,targetScreen){
+  attacker.swingUntil=performance.now()+220;
+  attacker.lastAttackSide=(attacker.lastAttackSide||1)*-1;
+  target.blockUntil=performance.now()+160;
+  target.hitUntil=performance.now()+180;
+  target.hitFrom=attacker.facing;
   const tier=getTier(attacker);
   const skill=getRandomSkill(tier);
   // Show skill name
@@ -1985,43 +2534,46 @@ cvEl.addEventListener('click',e=>{
   const rect=cvEl.getBoundingClientRect();
   const mx=e.clientX-rect.left, my=e.clientY-rect.top;
   const detailEl=document.getElementById('agent-detail');
-  selectedAgent=null;
-  for(const a of agents){
-    if(!a.alive) continue;
-    const s=toScreen(a.gx,a.gy);
-    const r=12*baseScale*camZoom*soldierScale;
-    if(Math.hypot(mx-s.x,my-s.y)<r){
-      selectedAgent=a;
-      const tier=getTier(a);
-      detailEl.style.display='block';
-      detailEl.style.left=Math.min(e.clientX+10,W-200)+'px';
-      detailEl.style.top=Math.min(e.clientY+10,H-180)+'px';
-      detailEl.innerHTML=`
-        <div class="ad-name" style="color:${a.color}">${a.factionName} #${a.id} [T${tier}]</div>
-        <div class="ad-row"><span>ELO</span><span>${Math.round(a.elo)}</span></div>
-        <div class="ad-row"><span>HP</span><span>${Math.round(a.hp)}%</span></div>
-        <div class="ad-row"><span>GEN</span><span>${a.gen}</span></div>
-        <div class="ad-row"><span>KILLS</span><span>${a.kills}</span></div>
-        <div class="ad-row"><span>${lang==='zh'?'可行性':'Feasibility'}</span><span>${a.fitness.feasibility.toFixed(1)}</span></div>
-        <div class="ad-row"><span>${lang==='zh'?'创新性':'Innovation'}</span><span>${a.fitness.innovation.toFixed(1)}</span></div>
-        <div class="ad-row"><span>${lang==='zh'?'具体性':'Specificity'}</span><span>${a.fitness.specificity.toFixed(1)}</span></div>
-        <div class="ad-row"><span>${lang==='zh'?'成本':'Cost Eff.'}</span><span>${a.fitness.cost.toFixed(1)}</span></div>
-        <div class="ad-row"><span>${lang==='zh'?'突变':'Mutated'}</span><span>${a.mutated?'✓':'—'}</span></div>
-        <div class="ad-row"><span>${lang==='zh'?'父代':'Parents'}</span><span>${a.parents||'—'}</span></div>
-      `;
-      return;
-    }
+  const agent=getAgentAtPoint(mx,my);
+  selectedAgent=agent;
+  if(agent){
+    const tier=getTier(agent);
+    detailEl.style.display='block';
+    detailEl.style.left=Math.min(mx+12,W-220)+'px';
+    detailEl.style.top=Math.min(my+12,H-190)+'px';
+    detailEl.innerHTML=`
+      <div class="ad-name" style="color:${agent.color}">${agent.factionName} #${agent.id} [T${tier}]</div>
+      <div class="ad-row"><span>ELO</span><span>${Math.round(agent.elo)}</span></div>
+      <div class="ad-row"><span>HP</span><span>${Math.round(agent.hp)}%</span></div>
+      <div class="ad-row"><span>GEN</span><span>${agent.gen}</span></div>
+      <div class="ad-row"><span>KILLS</span><span>${agent.kills}</span></div>
+      <div class="ad-row"><span>${lang==='zh'?'可行性':'Feasibility'}</span><span>${agent.fitness.feasibility.toFixed(1)}</span></div>
+      <div class="ad-row"><span>${lang==='zh'?'创新性':'Innovation'}</span><span>${agent.fitness.innovation.toFixed(1)}</span></div>
+      <div class="ad-row"><span>${lang==='zh'?'具体性':'Specificity'}</span><span>${agent.fitness.specificity.toFixed(1)}</span></div>
+      <div class="ad-row"><span>${lang==='zh'?'成本':'Cost Eff.'}</span><span>${agent.fitness.cost.toFixed(1)}</span></div>
+      <div class="ad-row"><span>${lang==='zh'?'突变':'Mutated'}</span><span>${agent.mutated?'✓':'—'}</span></div>
+      <div class="ad-row"><span>${lang==='zh'?'父代':'Parents'}</span><span>${agent.parents||'—'}</span></div>
+    `;
+    focusCameraOnAgent(agent,1.85);
+    updateSidebar();
+    return;
   }
   detailEl.style.display='none';
+  updateSidebar();
 });
 
 /* ---------- SECTION: WAR PHASES ---------- */
 function moveAgent(a,tx,ty,speed){
   const dx=tx-a.gx,dy=ty-a.gy,d=Math.hypot(dx,dy);
   if(d>.2){
-    a.gx+=dx/d*Math.min(speed,d);
-    a.gy+=dy/d*Math.min(speed,d);
+    const step=Math.min(speed,d);
+    a.gx+=dx/d*step;
+    a.gy+=dy/d*step;
     a.facing=dx>0?1:-1;
+    a.motion=Math.min(1,step*3);
+    a.walkCycle=(a.walkCycle||0)+step*3.4;
+  }else{
+    a.motion=(a.motion||0)*0.8;
   }
 }
 function idleWander(){
@@ -2688,12 +3240,12 @@ function render(){
     const sc=baseScale*camZoom;
     const tier=getTier(a);
     if(a.chute&&a.chuteY<0){
-      drawSoldier(s.x,s.y+a.chuteY*sc,a.color,tier,sc,a.alive,a.facing,a===selectedAgent);
+      drawSoldier(s.x,s.y+a.chuteY*sc,a.color,tier,sc,a.alive,a.facing,a===selectedAgent,a);
       drawParachute(s.x,s.y+a.chuteY*sc,a.color,sc);
     } else {
       // Energy aura for high-tier agents
       if(a.alive) drawAura(s.x,s.y,a.color,tier,sc*soldierScale);
-      drawSoldier(s.x,s.y,a.color,tier,sc,a.alive,a.facing,a===selectedAgent);
+      drawSoldier(s.x,s.y,a.color,tier,sc,a.alive,a.facing,a===selectedAgent,a);
     }
     // HP bar above agent
     if(a.alive&&a.hp<100){
@@ -2727,6 +3279,8 @@ function render(){
     const bs=toScreen(mid+4,mid);
     drawBoss(bs.x,bs.y,baseScale*camZoom);
   }
+  if(hoveredAgent&&hoveredAgent!==selectedAgent) drawAgentFocusOverlay(hoveredAgent,false);
+  if(selectedAgent) drawAgentFocusOverlay(selectedAgent,true);
   // rank badges
   drawRankBadges();
   // particles & float text
@@ -2754,6 +3308,8 @@ function nudgeCamera(dx,dy){
 }
 
 function setBroadcast(headline,subline,summary,tag){
+  let tone='normal';
+  if(arguments.length>4) tone=arguments[4]||'normal';
   if(headline) broadcastHeadline=headline;
   if(subline) broadcastSubline=subline;
   if(summary) broadcastSummary=summary;
@@ -2761,10 +3317,15 @@ function setBroadcast(headline,subline,summary,tag){
   const subEl=document.getElementById('broadcast-sub');
   const sumEl=document.getElementById('broadcast-summary');
   const tagEl=document.getElementById('broadcast-tag');
+  const cardEl=document.getElementById('broadcast-card');
   if(titleEl) titleEl.textContent=broadcastHeadline;
   if(subEl) subEl.textContent=broadcastSubline;
   if(sumEl) sumEl.textContent=broadcastSummary;
-  if(tagEl) tagEl.textContent=tag||t('liveUpdate');
+  if(tagEl){
+    tagEl.textContent=tag||t('liveUpdate');
+    tagEl.classList.toggle('peak',tone==='peak');
+  }
+  if(cardEl) cardEl.classList.toggle('broadcast-card-peak',tone==='peak');
 }
 
 function updateChampionBroadcast(){
@@ -2802,11 +3363,209 @@ function showToast(message){
   toastTimer=setTimeout(()=>el.classList.remove('show'),1800);
 }
 
+function escapeHtml(value){
+  return String(value??'')
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
+}
+
+function formatAnswerHtml(text){
+  const clean=(text||'').trim();
+  return clean?escapeHtml(clean).replace(/\n/g,'<br>'):'';
+}
+
+function copyTextWithFallback(text){
+  const clean=(text||'').trim();
+  if(!clean) return Promise.resolve(false);
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    return navigator.clipboard.writeText(clean).then(()=>true).catch(()=>false);
+  }
+  return new Promise(resolve=>{
+    const ta=document.createElement('textarea');
+    ta.value=clean;
+    ta.setAttribute('readonly','readonly');
+    ta.style.position='fixed';
+    ta.style.top='-1000px';
+    document.body.appendChild(ta);
+    ta.select();
+    let ok=false;
+    try{ ok=document.execCommand('copy'); }catch(e){ ok=false; }
+    document.body.removeChild(ta);
+    resolve(ok);
+  });
+}
+
+function buildChampionReasons(results,champion){
+  const reasons=[];
+  if(champion&&champion.fitness){
+    const fitnessEntries=[
+      ['Feasibility',Number(champion.fitness.feasibility||0)],
+      ['Innovation',Number(champion.fitness.innovation||0)],
+      ['Specificity',Number(champion.fitness.specificity||0)],
+      ['Cost',Number(champion.fitness.cost||0)],
+    ].sort((a,b)=>b[1]-a[1]);
+    const topMetric=fitnessEntries[0];
+    if(topMetric&&topMetric[1]>0){
+      reasons.push(lang==='zh'
+        ? `${topMetric[0]} 指标最强，得分 ${topMetric[1].toFixed(1)}。`
+        : `${topMetric[0]} led the pack at ${topMetric[1].toFixed(1)}.`);
+    }
+    if((champion.kills||0)>0){
+      reasons.push(lang==='zh'
+        ? `它在战场中完成了 ${champion.kills} 次击杀，说明对抗稳定性更强。`
+        : `It logged ${champion.kills} kills, showing stronger duel resilience.`);
+    }
+    if(getTier(champion)>=4){
+      reasons.push(lang==='zh'
+        ? `最终进入 T${getTier(champion)}，说明 Elo 与综合战力在后期仍持续抬升。`
+        : `It finished at T${getTier(champion)}, meaning its Elo kept climbing late into the run.`);
+    }
+  }
+  if(Array.isArray(results?.generations_data)&&results.generations_data.length>=2){
+    const first=Number(results.generations_data[0]?.best_fitness||0);
+    const last=Number(results.generations_data[results.generations_data.length-1]?.best_fitness||0);
+    if(last>first){
+      reasons.push(lang==='zh'
+        ? `最佳分数从 ${first.toFixed(2)} 提升到 ${last.toFixed(2)}，进化过程确实带来了质量增益。`
+        : `Best fitness improved from ${first.toFixed(2)} to ${last.toFixed(2)}, so the evolution loop created a real quality gain.`);
+    }
+  }
+  return reasons.slice(0,4);
+}
+
+function buildExecutiveSummary(results,answerDeck,champion){
+  const parts=[];
+  if(answerDeck.takeaway) parts.push(answerDeck.takeaway);
+  if(champion){
+    parts.push(lang==='zh'
+      ? `${champion.factionName} #${champion.id} 在最终阶段保持领先，并以 T${getTier(champion)} 结束本轮进化。`
+      : `${champion.factionName} #${champion.id} held the lead late and finished this run at T${getTier(champion)}.`);
+  }
+  if(Array.isArray(results.generations_data)&&results.generations_data.length>=2){
+    const first=Number(results.generations_data[0]?.best_fitness||0);
+    const last=Number(results.generations_data[results.generations_data.length-1]?.best_fitness||0);
+    if(last>first){
+      parts.push(lang==='zh'
+        ? `最佳分数从 ${first.toFixed(2)} 提升到 ${last.toFixed(2)}，说明这轮进化确实提升了答案质量。`
+        : `Best fitness moved from ${first.toFixed(2)} to ${last.toFixed(2)}, which shows the run improved answer quality.`);
+    }
+  }
+  return parts.filter(Boolean).slice(0,3);
+}
+
+function buildRecommendedNext(answerDeck,champion){
+  if(answerDeck.actions.length) return answerDeck.actions[0];
+  if(champion){
+    return lang==='zh'
+      ? `先围绕 ${champion.factionName} 冠军方案做一次小范围验证，再决定是否加预算做更深轮次。`
+      : `Validate the ${champion.factionName} champion plan in a narrow test before spending more budget on a deeper run.`;
+  }
+  return lang==='zh'
+    ? '先收窄任务范围，再用更清晰的问题重新运行一轮。'
+    : 'Tighten the mission scope and rerun with a clearer prompt.';
+}
+
+function buildAlternativeLosses(top5,champion){
+  const others=(top5||[]).filter(unit=>!champion||unit.id!==champion.id).slice(0,3);
+  if(!others.length){
+    return [lang==='zh'?'当前没有足够的对照单位可解释。':'Not enough competing units were available to compare.'];
+  }
+  return others.map(unit=>{
+    const tierVal=typeof unit.elo==='number'?getTier(unit):(unit.gen>=3?4:1);
+    return lang==='zh'
+      ? `${unit.factionName||unit.provider||'Unknown'} #${unit.id} 最终停在 T${tierVal} / ELO ${Math.round(unit.elo||0)}，说明它进入后期后没有继续扩大优势。`
+      : `${unit.factionName||unit.provider||'Unknown'} #${unit.id} stalled at T${tierVal} / ELO ${Math.round(unit.elo||0)}, so it failed to widen its lead in the late game.`;
+  });
+}
+
+function buildRunReportText(){
+  const results=lastWarResults||{};
+  const champion=aliveAgents().sort((a,b)=>b.elo-a.elo)[0];
+  const reasons=buildChampionReasons(results,champion);
+  const top5=(Array.isArray(results.top5)&&results.top5.length?results.top5:aliveAgents().sort((a,b)=>b.elo-a.elo).slice(0,5));
+  const lines=[
+    `EvoHive War Report`,
+    `Mission: ${results.problem||currentProblem||'N/A'}`,
+    `Mode: ${String(currentMode||'fast').toUpperCase()}`,
+    `Budget: $${Number(currentBudget||0).toFixed(1)}`,
+    `Search: ${currentSearch?'ON':'OFF'}`,
+    `API Calls: ${results.total_api_calls||currentApiCalls||0}`,
+    `Estimated Cost: $${Number(results.estimated_cost||0).toFixed(2)}`,
+    ``,
+    `Champion`,
+    champion?`${champion.factionName} #${champion.id} | T${getTier(champion)} | ELO ${Math.round(champion.elo||0)}`:'No champion available',
+    ``,
+    `Why it won`,
+    ...(reasons.length?reasons:['No champion rationale available']),
+    ``,
+    `Final Answer`,
+    (results.evolved_answer||'').trim()||'No final answer returned.',
+    ``,
+    `Top Fighters`,
+    ...top5.map((unit,idx)=>`${idx+1}. ${(unit.factionName||unit.provider||'Unknown')} #${unit.id} | ELO ${Math.round(unit.elo||0)}`),
+  ];
+  return lines.join('\n');
+}
+
+function getGenerationTimelineMeta(gensData){
+  const numeric=gensData
+    .map(gd=>Number(gd?.best_fitness))
+    .filter(val=>Number.isFinite(val));
+  if(!numeric.length){
+    return {min:0,max:1,span:1};
+  }
+  const min=Math.min(...numeric);
+  const max=Math.max(...numeric);
+  const span=Math.max(1e-6,max-min);
+  return {min,max,span};
+}
+
+function exportRunReport(){
+  const text=buildRunReportText();
+  try{
+    const blob=new Blob([text],{type:'text/plain;charset=utf-8'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;
+    a.download=`evohive-war-report-${Date.now()}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast(t('reportExported'));
+  }catch(e){
+    showToast(t('reportExportFailed'));
+  }
+}
+
 function copyCurrentAnswer(){
-  const text=(lastWarResults&&lastWarResults.evolved_answer)||'';
-  if(navigator.clipboard&&text){
-    navigator.clipboard.writeText(text);
-    showToast(lang==='zh'?'最终答案已复制':'Final answer copied');
+  const text=(lastWarResults&&lastWarResults.evolved_answer)||buildRunReportText();
+  copyTextWithFallback(text).then(ok=>{
+    showToast(ok?(lang==='zh'?'最终答案已复制':'Final answer copied'):t('copyUnavailable'));
+  });
+}
+
+function startRunWatchdog(){
+  stopRunWatchdog();
+  runActive=true;
+  lastBackendEventAt=Date.now();
+  runWatchdogTimer=setInterval(()=>{
+    if(!runActive||currentRunError) return;
+    if(Date.now()-lastBackendEventAt>15000){
+      currentStatusText=t('backendSlow');
+      updateRuntimeStatus();
+    }
+  },3000);
+}
+
+function stopRunWatchdog(){
+  runActive=false;
+  if(runWatchdogTimer){
+    clearInterval(runWatchdogTimer);
+    runWatchdogTimer=null;
   }
 }
 
@@ -2846,9 +3605,12 @@ function showResults(){
   const missionText=results.problem||currentProblem;
   const top5Results=Array.isArray(results.top5)&&results.top5.length?results.top5:null;
   const evolvedAnswer=(results.evolved_answer||'').trim();
+  const evolvedAnswerHtml=formatAnswerHtml(evolvedAnswer);
   const gensData=Array.isArray(results.generations_data)?results.generations_data:[];
   const recentLog=battlelog.slice(0,12);
   const hasError=!!currentRunError;
+  const championReasons=buildChampionReasons(results,champion);
+  const missionHtml=escapeHtml(missionText||'');
   // faction breakdown
   let factionHtml='';
   for(const f of FACTIONS){
@@ -2856,16 +3618,21 @@ function showResults(){
     const fAlive=alive.filter(a=>a.faction===fi);
     const fAll=agents.filter(a=>a.faction===fi);
     const fKills=fAll.reduce((s,a)=>s+a.kills,0);
+    const survivalPct=fAll.length?Math.round((fAlive.length/fAll.length)*100):0;
     factionHtml+=`<div class="res-faction-row">
       <div class="faction-dot" style="background:${f.color}"></div>
-      <span style="color:${f.color};flex:1">${f.name}</span>
-      <span>${fAlive.length}/${fAll.length}</span>
-      <span style="margin-left:12px">${fKills} kills</span>
+      <div class="res-faction-copy">
+        <strong style="color:${f.color}">${escapeHtml(f.name)}</strong>
+        <span>${fAlive.length}/${fAll.length} alive · ${fKills} kills · ${survivalPct}% survival</span>
+      </div>
+      <span>${survivalPct}%</span>
+      <div class="res-faction-bar"><div class="res-faction-bar-fill" style="width:${survivalPct}%;background:${f.color}"></div></div>
     </div>`;
   }
   // top 5
   let topHtml='';
   const top5=top5Results||alive.sort((a,b)=>b.elo-a.elo).slice(0,5);
+  const alternativeLosses=buildAlternativeLosses(top5,champion);
   const medals=['🥇','🥈','🥉','④','⑤'];
   top5.forEach((a,i)=>{
     const color=a.color||a.provider&&ALL_PROVIDERS.find(p=>p.id===a.provider)?.color||'#c8e6c8';
@@ -2874,52 +3641,76 @@ function showResults(){
     topHtml+=`<div class="res-rank-row">
       <div class="res-rank-num">${medals[i]}</div>
       <div class="faction-dot" style="background:${color}"></div>
-      <span style="color:${color};flex:1">${name}#${a.id}</span>
+      <span style="color:${color};flex:1">${escapeHtml(name)}#${a.id}</span>
       <span>T${tierVal}</span>
       <span style="margin-left:8px">ELO ${Math.round(a.elo||0)}</span>
     </div>`;
   });
   let generationHtml='';
   if(gensData.length){
+    const timelineMeta=getGenerationTimelineMeta(gensData);
     generationHtml=gensData.map(gd=>{
-      const best=Math.max(0,Math.min(1,Number(gd.best_fitness||0)));
+      const rawBest=Number(gd.best_fitness);
+      const bestVal=Number.isFinite(rawBest)?rawBest:0;
+      const best=Math.max(0,Math.min(1,(bestVal-timelineMeta.min)/timelineMeta.span));
       return `<div class="res-timeline-row">
         <div class="res-timeline-gen">G${gd.generation}</div>
         <div class="res-timeline-bar"><div class="res-timeline-fill" style="width:${(best*100).toFixed(0)}%"></div></div>
-        <div class="res-timeline-meta">${Number(gd.best_fitness||0).toFixed(2)}</div>
+        <div class="res-timeline-meta">${bestVal.toFixed(2)}</div>
       </div>`;
     }).join('');
   } else {
     generationHtml=`<div class="res-summary-text">${lang==='zh'?'当前没有代际统计数据。':'No generation telemetry available for this run.'}</div>`;
   }
   const answerDeck=extractAnswerDeck(evolvedAnswer);
+  const executiveSummary=buildExecutiveSummary(results,answerDeck,champion);
+  const nextStep=buildRecommendedNext(answerDeck,champion);
   const actionsHtml=answerDeck.actions.length
-    ? answerDeck.actions.map(item=>`<div class="res-log-entry">${item}</div>`).join('')
+    ? answerDeck.actions.map(item=>`<div class="res-log-entry">${escapeHtml(item)}</div>`).join('')
     : `<div class="res-summary-text">${lang==='zh'?'当前没有提取到明确行动项。':'No concrete action items were extracted from this run.'}</div>`;
   const risksHtml=answerDeck.risks.length
-    ? answerDeck.risks.map(item=>`<div class="res-log-entry">${item}</div>`).join('')
+    ? answerDeck.risks.map(item=>`<div class="res-log-entry">${escapeHtml(item)}</div>`).join('')
     : `<div class="res-summary-text">${lang==='zh'?'当前没有提取到显著风险提醒。':'No major risk notes were extracted from this run.'}</div>`;
   let recentLogHtml='';
   if(recentLog.length){
-    recentLogHtml=recentLog.map(entry=>`<div class="res-log-entry">[${entry.time}] ${entry.msg}</div>`).join('');
+    recentLogHtml=recentLog.map(entry=>`<div class="res-log-entry">[${escapeHtml(entry.time)}] ${escapeHtml(entry.msg)}</div>`).join('');
   } else {
     recentLogHtml=`<div class="res-summary-text">${lang==='zh'?'当前没有可展示的运行日志。':'No run log entries available yet.'}</div>`;
   }
 
   content.innerHTML=`
     <div class="res-hero">
-      <div class="res-crown">👑</div>
-      <div class="res-champ">${champion?champion.factionName+' #'+champion.id:'—'}</div>
-      <div class="res-champ-sub">ELO ${champion?Math.round(champion.elo):0} | T${champion?getTier(champion):0} | GEN ${champion?champion.gen:0}</div>
-      <div class="res-pill-row">
-        <div class="res-pill">${String(currentMode||'fast').toUpperCase()}</div>
-        <div class="res-pill">$${Number(currentBudget||0).toFixed(1)} budget</div>
-        <div class="res-pill">${currentSearch?'Search ON':'Search OFF'}</div>
-        <div class="res-pill">${selectedProviders.size} factions</div>
-      </div>
-      <div class="res-mission">
-        <strong>${t('currentMission')}</strong>
-        ${missionText}
+      <div class="res-hero-grid">
+        <div class="res-hero-main">
+          <div class="res-crown">👑</div>
+          <div class="res-champ">${champion?`${escapeHtml(champion.factionName)} #${champion.id}`:'—'}</div>
+          <div class="res-champ-sub">ELO ${champion?Math.round(champion.elo):0} | T${champion?getTier(champion):0} | GEN ${champion?champion.gen:0}</div>
+          <div class="res-pill-row">
+            <div class="res-pill">${String(currentMode||'fast').toUpperCase()}</div>
+            <div class="res-pill">$${Number(currentBudget||0).toFixed(1)} budget</div>
+            <div class="res-pill">${currentSearch?'Search ON':'Search OFF'}</div>
+            <div class="res-pill">${selectedProviders.size} factions</div>
+          </div>
+          <div class="res-mission">
+            <strong>${t('currentMission')}</strong>
+            ${missionHtml}
+          </div>
+        </div>
+        <div class="res-hero-side">
+          <div class="res-spotlight">
+            <strong>${t('summaryDeck')}</strong>
+            <p>${escapeHtml(answerDeck.takeaway||nextStep||'—')}</p>
+          </div>
+          <div class="res-spotlight">
+            <strong>${lang==='zh'?'战后快照':'Post-War Snapshot'}</strong>
+            <div class="res-micro-list">
+              <div class="res-micro-row"><span>${t('runProgress')}</span><span>100%</span></div>
+              <div class="res-micro-row"><span>${t('apiCalls')}</span><span>${apiCalls}</span></div>
+              <div class="res-micro-row"><span>${t('cost')}</span><span>$${estCost.toFixed(2)}</span></div>
+              <div class="res-micro-row"><span>${t('generations')}</span><span>${GENS}</span></div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
     <div class="res-grid">
@@ -2930,11 +3721,30 @@ function showResults(){
       <div class="res-card"><div class="res-card-val">${apiCalls}</div><div class="res-card-lbl">${t('apiCalls')}</div></div>
       <div class="res-card"><div class="res-card-val">$${estCost.toFixed(2)}</div><div class="res-card-lbl">${t('cost')}</div></div>
     </div>
+    <div class="res-pro-report">
+      <div class="res-callout">
+        <div class="res-section-title">${t('executiveSummary')}</div>
+        <p>${executiveSummary.map(item=>escapeHtml(item)).join('<br><br>')}</p>
+        <div class="res-chip-list">
+          <div class="res-chip">${String(currentMode||'fast').toUpperCase()}</div>
+          <div class="res-chip">${apiCalls} ${t('apiCalls').toLowerCase()}</div>
+          <div class="res-chip">$${estCost.toFixed(2)}</div>
+        </div>
+      </div>
+      <div class="res-callout">
+        <div class="res-section-title">${t('recommendedNext')}</div>
+        <p>${escapeHtml(nextStep)}</p>
+        <div class="res-section-title" style="margin-top:14px">${t('alternativesLost')}</div>
+        <div class="res-log" style="max-height:none;padding:0;border:none;background:none">
+          ${alternativeLosses.map(item=>`<div class="res-log-entry">${escapeHtml(item)}</div>`).join('')}
+        </div>
+      </div>
+    </div>
     <div class="res-summary-grid">
       <div class="res-summary-card">
         <div class="res-section-title">${t('summaryDeck')}</div>
         <div class="res-list">
-          <div class="res-list-row"><span>${t('keyTakeaway')}</span><span>${answerDeck.takeaway||'—'}</span></div>
+          <div class="res-list-row"><span>${t('keyTakeaway')}</span><span>${escapeHtml(answerDeck.takeaway||'—')}</span></div>
           <div class="res-list-row"><span>${t('runSummary')}</span><span>${results.event_count||wsEventLog.length||0} events / ${GENS} gens</span></div>
           <div class="res-list-row"><span>${t('budgetLabel')}</span><span>$${Number(currentBudget||0).toFixed(1)}</span></div>
           <div class="res-list-row"><span>${t('apiCalls')}</span><span>${apiCalls}</span></div>
@@ -2942,7 +3752,7 @@ function showResults(){
       </div>
       <div class="res-summary-card ${hasError?'error':''}">
         <div class="res-section-title">${t('evolvedAnswer')}</div>
-        <div class="res-summary-text">${hasError?(lang==='zh'?`这次运行未成功完成。<br><br>${currentRunError}<br><br>建议检查模型可用性、预算设置、WebSocket 连接和后端日志。`:`This run did not complete successfully.<br><br>${currentRunError}<br><br>Check model availability, budget settings, WebSocket connectivity, and backend logs.`):evolvedAnswer?evolvedAnswer.replace(/\n/g,'<br>'):(lang==='zh'?'当前运行还没有返回最终正文答案。':'No final long-form answer was returned for this run yet.')}</div>
+        <div class="res-summary-text">${hasError?(lang==='zh'?`这次运行未成功完成。<br><br>${escapeHtml(currentRunError)}<br><br>建议检查模型可用性、预算设置、WebSocket 连接和后端日志。`:`This run did not complete successfully.<br><br>${escapeHtml(currentRunError)}<br><br>Check model availability, budget settings, WebSocket connectivity, and backend logs.`):(evolvedAnswerHtml||t('emptyAnswer'))}</div>
       </div>
       <div class="res-summary-card">
         <div class="res-section-title">Run Snapshot</div>
@@ -2981,15 +3791,12 @@ function showResults(){
       ${topHtml}
     </div>
     <div class="res-section">
-      <div class="res-section-title">${t('evolvedAnswer')}</div>
+      <div class="res-section-title">${t('whyChampionWon')}</div>
       <div id="res-answer">
-        ${evolvedAnswer?evolvedAnswer.replace(/\n/g,'<br>'):champion?`<strong>${champion.factionName} #${champion.id}</strong> (T${getTier(champion)})<br>
-        Feasibility: ${champion.fitness.feasibility.toFixed(1)} | Innovation: ${champion.fitness.innovation.toFixed(1)}<br>
-        Specificity: ${champion.fitness.specificity.toFixed(1)} | Cost Efficiency: ${champion.fitness.cost.toFixed(1)}<br>
-        Mutated: ${champion.mutated?'Yes':'No'} | Parents: ${champion.parents||'Original'}<br><br>
-        <em>${lang==='zh'?'在实际运行中，此处将展示由 EvoHive 进化引擎生成的最优方案。':'In production, this displays the optimal solution generated by the EvoHive evolution engine.'}</em>`:'No champion survived.'}
+        ${championReasons.length
+          ? championReasons.map(item=>`<div class="res-log-entry">${escapeHtml(item)}</div>`).join('')
+          : `<div class="res-summary-text">${lang==='zh'?'当前还没有足够的冠军解释数据。':'Not enough champion rationale is available yet.'}</div>`}
       </div>
-      <button class="res-action-btn" style="margin-top:12px" onclick="copyCurrentAnswer()">${t('copyAnswer')}</button>
     </div>
     <div class="res-summary-grid">
       <div class="res-summary-card">
@@ -3005,19 +3812,33 @@ function showResults(){
       <div class="res-section-title">${lang==='zh'?'最近运行日志':'Recent Run Log'}</div>
       <div class="res-log">${recentLogHtml}</div>
     </div>
-    <button class="res-action-btn" onclick="document.getElementById('results').style.display='none';restartWar()">${t('restart')}</button>
+    <div class="res-action-rail">
+      <button class="res-action-btn" onclick="copyCurrentAnswer()">${t('copyAnswer')}</button>
+      <button class="res-action-btn" onclick="exportRunReport()">${t('exportReport')}</button>
+      <button class="res-action-btn" onclick="document.getElementById('results').style.display='none';restartWar()">${t('restart')}</button>
+    </div>
   `;
   el.style.display='block';
 }
 function restartWar(){
-  agents=[];particles=[];floatTexts=[];killfeed=[];battlelog=[];
+  stopRunWatchdog();
+  agents=[];particles=[];floatTexts=[];killfeed=[];battlelog=[];wsEventLog=[];
+  backendEventQueue=[];processingBackendEvents=false;
   totalKills=0;currentPhase=0;currentGen=1;
   currentApiCalls=0;currentProgress=0;currentStageLabel='Standby';currentStatusText='Waiting for deployment.';currentRunError='';
   stormZone.radius=COLS/2+2;stormZone.targetRadius=5;
   redMonsters=[];meteors=[];scanTarget=null;forgeActive=false;
-  selectedAgent=null;
+  selectedAgent=null;lastWarResults=null;lastChampionKey='';
   camTargetX=0;camTargetY=0;camTargetZoom=1;camX=0;camY=0;camZoom=1;
+  setBroadcast(
+    lang==='zh'?'等待新战役':'Waiting for the next war',
+    lang==='zh'?'配置一个新任务后再次部署。':'Configure a new mission to redeploy the battlefield.',
+    lang==='zh'?'这里会在关键阶段持续提示观众当前最值得看的变化。':'This feed will keep highlighting the most important shifts during the next run.',
+    t('liveUpdate')
+  );
   updateSidebar();
+  updateRuntimeStatus();
+  document.getElementById('results').style.display='none';
   document.getElementById('config-modal').style.display='flex';
   renderConfigProviders();
 }
@@ -3025,6 +3846,9 @@ function restartWar(){
 /* ---------- SECTION: INIT ---------- */
 document.getElementById('lang-btn').addEventListener('click',()=>{
   lang=lang==='en'?'zh':'en';
+  renderLaunchPresets();
+  renderPromptSuggestions();
+  renderConfigInsights();
   updateI18N();updateSidebar();
 });
 document.getElementById('pause-btn').addEventListener('click',()=>{
@@ -3074,17 +3898,26 @@ updateI18N();
 /* ---------- SECTION: CONFIG MODAL ---------- */
 function renderConfigProviders(){
   const el=document.getElementById('cfg-providers');
-  el.innerHTML=ALL_PROVIDERS.map(p=>{
-    const sel=selectedProviders.has(p.id)?'selected':'';
-    return `<div class="cfg-prov ${sel}" data-pid="${p.id}" tabindex="0" role="checkbox" aria-checked="${sel?'true':'false'}">
-      <div class="cfg-prov-head">
-        <div class="cfg-check">${sel?'✓':''}</div>
-        <div class="cfg-prov-dot" style="background:${p.color}"></div>
-        <div class="cfg-prov-name">${p.name}</div>
-      </div>
-      <div class="cfg-prov-models">${p.models.join(', ')}</div>
-    </div>`;
-  }).join('');
+  if(!el) return;
+  try{
+    const providers=Array.isArray(ALL_PROVIDERS)?ALL_PROVIDERS:[];
+    const cards=providers.map(p=>{
+      const sel=selectedProviders.has(p.id)?'selected':'';
+      const models=Array.isArray(p.models)&&p.models.length?p.models.join(', '):(lang==='zh'?'模型信息待补充':'Model roster coming soon');
+      return `<div class="cfg-prov ${sel}" data-pid="${p.id}" tabindex="0" role="checkbox" aria-checked="${sel?'true':'false'}">
+        <div class="cfg-prov-head">
+          <div class="cfg-check">${sel?'✓':''}</div>
+          <div class="cfg-prov-dot" style="background:${p.color||'#8fd18c'}"></div>
+          <div class="cfg-prov-name">${escapeHtml(p.name||p.id||'Unknown')}</div>
+        </div>
+        <div class="cfg-prov-models">${escapeHtml(models)}</div>
+      </div>`;
+    }).join('');
+    el.innerHTML=cards||`<div class="cfg-providers-empty">${lang==='zh'?'当前没有可用模型卡片。请刷新页面或重新载入配置。':'No provider cards are available right now. Refresh the page or reload the config.'}</div>`;
+  }catch(err){
+    console.warn('[cfg-providers] render failed',err);
+    el.innerHTML=`<div class="cfg-providers-empty">${lang==='zh'?'模型选择面板加载失败，请刷新页面后重试。':'The model selection panel failed to load. Please refresh and try again.'}</div>`;
+  }
   updateConfigSummary();
 }
 // Delegated click handler — no listener accumulation
@@ -3136,28 +3969,80 @@ document.getElementById('cfg-history-list').addEventListener('click',e=>{
     document.getElementById('start-war-btn').click();
   }
 });
+document.getElementById('cfg-preset-grid').addEventListener('click',e=>{
+  const btn=e.target.closest('[data-launch-preset]');
+  if(!btn) return;
+  const preset=LAUNCH_PRESETS.find(item=>item.id===btn.dataset.launchPreset);
+  if(!preset) return;
+  document.getElementById('cfg-agents').value=preset.total;
+  document.getElementById('cfg-gens').value=preset.gens;
+  document.getElementById('cfg-mode').value=preset.mode;
+  document.getElementById('cfg-budget').value=preset.budget;
+  document.getElementById('cfg-agents-val').textContent=String(preset.total);
+  document.getElementById('cfg-gens-val').textContent=String(preset.gens);
+  updateConfigSummary();
+  showToast(lang==='zh'?'已应用开战预设':'Launch preset applied');
+});
+document.getElementById('cfg-prompt-suggestions').addEventListener('click',e=>{
+  const btn=e.target.closest('[data-prompt-suggestion]');
+  if(!btn) return;
+  const suggestion=PROMPT_SUGGESTIONS.find(item=>item.id===btn.dataset.promptSuggestion);
+  if(!suggestion) return;
+  const prompt=suggestion[lang]||suggestion.en;
+  const problemEl=document.getElementById('cfg-problem');
+  problemEl.value=prompt;
+  setCurrentProblem(prompt);
+  updateConfigSummary();
+  problemEl.focus();
+  problemEl.setSelectionRange(problemEl.value.length,problemEl.value.length);
+});
+document.getElementById('cfg-provider-toolbar').addEventListener('click',e=>{
+  const btn=e.target.closest('[data-provider-preset]');
+  if(!btn) return;
+  const nextProviders=PROVIDER_PRESETS[btn.dataset.providerPreset];
+  if(!Array.isArray(nextProviders)||nextProviders.length<2) return;
+  selectedProviders=new Set(nextProviders);
+  renderConfigProviders();
+  showToast(lang==='zh'?'已切换阵营组合':'Faction preset applied');
+});
 function updateConfigSummary(){
   const cnt=selectedProviders.size;
-  const problem=(document.getElementById('cfg-problem')?.value||'').trim();
+  const rawProblem=(document.getElementById('cfg-problem')?.value||'');
+  const problem=rawProblem.trim();
   const problemReady=problem.length>0;
   document.getElementById('cfg-sel-count').textContent=cnt;
   document.getElementById('cfg-sel-agents').textContent=document.getElementById('cfg-agents').value;
-  document.getElementById('cfg-problem-count').textContent=problem.length;
+  document.getElementById('cfg-problem-count').textContent=rawProblem.length;
   document.getElementById('start-war-btn').disabled=cnt<2||!problemReady;
   const errEl=document.getElementById('cfg-error');
   if(errEl){
     if(cnt<2){
-      errEl.textContent='Select at least 2 factions to start';
+      errEl.textContent=t('selectAtLeastTwo');
       errEl.style.display='block';
     }else if(!problemReady){
       errEl.textContent=t('problemTooShort');
+      errEl.style.display='block';
+    }else if(rawProblem.length>PROBLEM_HARD_LIMIT){
+      errEl.textContent=t('trimmedProblemHint');
+      errEl.style.display='block';
+    }else if(rawProblem.length>PROBLEM_SOFT_LIMIT){
+      errEl.textContent=t('longProblemHint');
       errEl.style.display='block';
     }else{
       errEl.style.display='none';
     }
   }
   const problemStatus=document.getElementById('cfg-problem-status');
-  if(problemStatus) problemStatus.textContent=problemReady?t('problemReady'):t('problemTooShort');
+  if(problemStatus){
+    problemStatus.textContent=!problemReady
+      ? t('problemTooShort')
+      : rawProblem.length>PROBLEM_HARD_LIMIT
+        ? t('trimmedProblemHint')
+        : rawProblem.length>PROBLEM_SOFT_LIMIT
+          ? t('longProblemHint')
+          : t('problemReady');
+  }
+  renderConfigInsights();
 }
 // Slider events
 document.getElementById('cfg-agents').addEventListener('input',e=>{
@@ -3166,13 +4051,26 @@ document.getElementById('cfg-agents').addEventListener('input',e=>{
 });
 document.getElementById('cfg-gens').addEventListener('input',e=>{
   document.getElementById('cfg-gens-val').textContent=e.target.value;
+  updateConfigSummary();
+});
+document.getElementById('cfg-budget').addEventListener('input',()=>{
+  updateConfigSummary();
+});
+document.getElementById('cfg-mode').addEventListener('change',()=>{
+  updateConfigSummary();
 });
 document.getElementById('cfg-problem').addEventListener('input',()=>{
   updateConfigSummary();
 });
 const briefingPanel=document.getElementById('briefing-panel');
+const broadcastCard=document.getElementById('broadcast-card');
+const appEl=document.getElementById('app');
+const canvasWrapEl=document.getElementById('canvas-wrap');
+let leftSidebarEl=document.getElementById('left-sidebar');
+const broadcastToggle=document.getElementById('broadcast-toggle');
 const briefingHead=document.querySelector('.briefing-head');
 const briefingToggle=document.getElementById('briefing-toggle');
+const briefingDetailToggle=document.getElementById('briefing-detail-toggle');
 const briefingSmaller=document.getElementById('briefing-smaller');
 const briefingLarger=document.getElementById('briefing-larger');
 const briefingResize=document.getElementById('briefing-resize');
@@ -3181,11 +4079,78 @@ const sidebarEl=document.getElementById('sidebar');
 const sidebarToggle=document.getElementById('sidebar-toggle');
 const sidebarPeek=document.getElementById('sidebar-peek');
 let briefingWidth=370;
+function setBroadcastCollapsed(collapsed){
+  if(!broadcastCard) return;
+  broadcastCard.classList.toggle('collapsed',!!collapsed);
+  if(broadcastToggle) broadcastToggle.textContent=collapsed?t('expandFeed'):t('collapseFeed');
+  try{localStorage.setItem(BROADCAST_STATE_KEY,collapsed?'collapsed':'expanded');}catch(e){}
+}
+function isLeftRailDocked(){
+  return !!(leftSidebarEl&&briefingPanel&&briefingPanel.parentElement===leftSidebarEl);
+}
+function ensureLeftSidebar(){
+  if(leftSidebarEl||!appEl||!canvasWrapEl) return;
+  leftSidebarEl=document.createElement('div');
+  leftSidebarEl.id='left-sidebar';
+  appEl.insertBefore(leftSidebarEl,canvasWrapEl);
+}
+function syncLeftRailLayout(){
+  if(!briefingPanel||!broadcastCard||!canvasWrapEl) return;
+  ensureLeftSidebar();
+  const shouldDock=window.innerWidth>1280&&!!leftSidebarEl;
+  if(shouldDock){
+    if(briefingPanel.parentElement!==leftSidebarEl) leftSidebarEl.appendChild(briefingPanel);
+    if(broadcastCard.parentElement!==leftSidebarEl) leftSidebarEl.appendChild(broadcastCard);
+    briefingPanel.style.left='';
+    briefingPanel.style.top='';
+    briefingPanel.style.right='';
+    broadcastCard.style.left='';
+    broadcastCard.style.top='';
+    broadcastCard.style.right='';
+    broadcastCard.style.width='';
+    broadcastCard.style.maxWidth='';
+    broadcastCard.style.transform='';
+    if(briefingPanel.classList.contains('minimized')) setBriefingMinimized(false);
+  }else{
+    if(briefingPanel.parentElement!==canvasWrapEl) canvasWrapEl.appendChild(briefingPanel);
+    if(broadcastCard.parentElement!==canvasWrapEl) canvasWrapEl.appendChild(broadcastCard);
+  }
+}
+function positionBroadcastCard(){
+  if(!broadcastCard||!briefingPanel) return;
+  const isMobile=window.innerWidth<=768;
+  if(isMobile||isLeftRailDocked()){
+    broadcastCard.style.left='';
+    broadcastCard.style.right='';
+    broadcastCard.style.top='';
+    broadcastCard.style.width='';
+    broadcastCard.style.maxWidth='';
+    broadcastCard.style.transform='';
+    return;
+  }
+  const panelRect=briefingPanel.getBoundingClientRect();
+  const desiredLeft=Math.max(18,panelRect.left);
+  const cardWidth=Math.min(360,Math.max(300,panelRect.width));
+  broadcastCard.style.left=`${desiredLeft}px`;
+  broadcastCard.style.right='auto';
+  broadcastCard.style.transform='none';
+  broadcastCard.style.width=`${cardWidth}px`;
+  broadcastCard.style.maxWidth=`${cardWidth}px`;
+  requestAnimationFrame(()=>{
+    const maxTop=window.innerHeight-broadcastCard.offsetHeight-18;
+    const anchoredTop=Math.min(maxTop,panelRect.bottom+12);
+    broadcastCard.style.top=`${Math.max(94,anchoredTop)}px`;
+  });
+}
 function applyBriefingWidth(){
   if(!briefingPanel) return;
   const isMobile=window.innerWidth<=768;
   if(isMobile){
     briefingPanel.style.width='auto';
+    return;
+  }
+  if(isLeftRailDocked()){
+    briefingPanel.style.width='100%';
     return;
   }
   const width=briefingPanel.classList.contains('minimized')
@@ -3201,6 +4166,14 @@ function setBriefingMinimized(minimized){
   briefingToggle.setAttribute('aria-label',minimized?'Expand briefing':'Collapse briefing');
   try{localStorage.setItem(BRIEFING_STATE_KEY,minimized?'minimized':'expanded');}catch(e){}
   applyBriefingWidth();
+  positionBroadcastCard();
+}
+
+function setBriefingCompact(compact){
+  briefingCompact=!!compact;
+  if(!briefingPanel) return;
+  briefingPanel.classList.toggle('compact',briefingCompact);
+  if(briefingDetailToggle) briefingDetailToggle.textContent=briefingCompact?t('showDetails'):t('hideDetails');
 }
 function setSidebarCollapsed(collapsed){
   if(!sidebarEl) return;
@@ -3216,7 +4189,9 @@ function setBriefingWidth(nextWidth){
   },BRIEFING_SIZE_STEPS[1]);
   applyBriefingWidth();
   try{localStorage.setItem(BRIEFING_SIZE_KEY,String(briefingWidth));}catch(e){}
+  positionBroadcastCard();
 }
+
 function stepBriefingWidth(direction){
   const currentIdx=Math.max(0,BRIEFING_SIZE_STEPS.findIndex(size=>size===briefingWidth));
   const nextIdx=Math.min(BRIEFING_SIZE_STEPS.length-1,Math.max(0,currentIdx+direction));
@@ -3233,11 +4208,33 @@ try{
 }catch(e){
   applyBriefingWidth();
 }
+setBriefingCompact(true);
+syncLeftRailLayout();
+positionBroadcastCard();
+try{
+  const savedBroadcastState=localStorage.getItem(BROADCAST_STATE_KEY);
+  if(savedBroadcastState==='collapsed') setBroadcastCollapsed(true);
+  else if(window.innerWidth<=480) setBroadcastCollapsed(true);
+}catch(e){
+  if(window.innerWidth<=480) setBroadcastCollapsed(true);
+}
+if(broadcastToggle){
+  broadcastToggle.addEventListener('click',e=>{
+    e.stopPropagation();
+    setBroadcastCollapsed(!broadcastCard.classList.contains('collapsed'));
+  });
+}
 if(briefingToggle){
   briefingToggle.addEventListener('click',e=>{
     e.stopPropagation();
     setBriefingMinimized(!briefingPanel.classList.contains('minimized'));
     showToast(briefingPanel.classList.contains('minimized')?(lang==='zh'?'任务简报已折叠':'Mission briefing collapsed'):(lang==='zh'?'任务简报已展开':'Mission briefing expanded'));
+  });
+}
+if(briefingDetailToggle){
+  briefingDetailToggle.addEventListener('click',e=>{
+    e.stopPropagation();
+    setBriefingCompact(!briefingCompact);
   });
 }
 if(briefingSmaller){
@@ -3270,9 +4267,11 @@ if(briefingHead&&briefingPanel){
     briefingPanel.style.left=`${left}px`;
     briefingPanel.style.top=`${top}px`;
     briefingPanel.style.right='auto';
+    positionBroadcastCard();
   };
   briefingHead.addEventListener('mousedown',e=>{
-    if(e.target.closest('#briefing-toggle')||e.target.closest('#briefing-smaller')||e.target.closest('#briefing-larger')) return;
+    if(isLeftRailDocked()) return;
+    if(e.target.closest('#briefing-toggle')||e.target.closest('#briefing-smaller')||e.target.closest('#briefing-larger')||e.target.closest('#briefing-detail-toggle')) return;
     dragState={
       offsetX:e.clientX-briefingPanel.offsetLeft,
       offsetY:e.clientY-briefingPanel.offsetTop,
@@ -3299,6 +4298,7 @@ if(briefingResize&&briefingPanel){
     try{localStorage.setItem(BRIEFING_SIZE_KEY,String(briefingWidth));}catch(e){}
   };
   briefingResize.addEventListener('mousedown',e=>{
+    if(isLeftRailDocked()) return;
     e.preventDefault();
     e.stopPropagation();
     resizeState={
@@ -3309,7 +4309,12 @@ if(briefingResize&&briefingPanel){
     window.addEventListener('mouseup',stopBriefingResize);
   });
 }
-window.addEventListener('resize',applyBriefingWidth);
+window.addEventListener('resize',()=>{syncLeftRailLayout();applyBriefingWidth();positionBroadcastCard();});
+window.addEventListener('resize',()=>{
+  if(window.innerWidth<=480 && !localStorage.getItem(BROADCAST_STATE_KEY)){
+    setBroadcastCollapsed(true);
+  }
+});
 document.querySelectorAll('[data-cam-move]').forEach(btn=>{
   btn.addEventListener('click',()=>{
     const move=btn.dataset.camMove;
@@ -3336,13 +4341,33 @@ if(sidebarPeek){
     setSidebarCollapsed(false);
   });
 }
+document.getElementById('faction-list').addEventListener('click',e=>{
+  const card=e.target.closest('[data-faction]');
+  if(!card) return;
+  const factionIndex=FACTIONS.findIndex(faction=>faction.id===card.dataset.faction);
+  if(factionIndex<0) return;
+  const target=aliveAgents()
+    .filter(agent=>agent.faction===factionIndex)
+    .sort((a,b)=>b.elo-a.elo)[0];
+  if(!target) return;
+  selectedAgent=target;
+  hoveredAgent=null;
+  focusCameraOnAgent(target,1.7);
+  showToast(t('focusFaction'));
+  updateSidebar();
+});
 // Start button
 document.getElementById('start-war-btn').addEventListener('click',()=>{
-  const problem=(document.getElementById('cfg-problem').value||'').trim();
+  const rawProblem=(document.getElementById('cfg-problem').value||'');
+  const problem=rawProblem.trim().slice(0,PROBLEM_HARD_LIMIT);
   const mode=document.getElementById('cfg-mode').value||'fast';
   const budget=Math.max(0.1,Number(document.getElementById('cfg-budget').value||0.5));
   const enableSearch=!!document.getElementById('cfg-search').checked;
   if(selectedProviders.size<2||!problem) return;
+  if(rawProblem.trim().length>PROBLEM_HARD_LIMIT){
+    document.getElementById('cfg-problem').value=problem;
+    showToast(t('trimmedProblemHint'));
+  }
   TOTAL=parseInt(document.getElementById('cfg-agents').value);
   GENS=parseInt(document.getElementById('cfg-gens').value);
   soldierScale=Math.max(.45,100/TOTAL);
@@ -3355,6 +4380,8 @@ document.getElementById('start-war-btn').addEventListener('click',()=>{
   currentStageLabel=lang==='zh'?'部署中':'Deploying';
   currentStatusText=lang==='zh'?'正在准备战场与后端任务...':'Preparing battlefield and backend mission...';
   currentRunError='';
+  backendEventQueue=[];processingBackendEvents=false;wsEventLog=[];lastWarResults=null;lastChampionKey='';
+  startRunWatchdog();
   updateRuntimeStatus();
   // persist config
   try{localStorage.setItem('evohive-cfg',JSON.stringify({total:TOTAL,gens:GENS,providers:[...selectedProviders],problem,mode,budget,enableSearch}));}catch(e){}
@@ -3403,8 +4430,11 @@ if(!document.getElementById('cfg-problem').value){
   document.getElementById('cfg-problem').value=DEFAULT_PROBLEM;
 }
 setCurrentProblem(document.getElementById('cfg-problem').value||DEFAULT_PROBLEM);
+renderLaunchPresets();
+renderPromptSuggestions();
 renderConfigProviders();
 updateConfigSummary();
+renderConfigInsights();
 updateRuntimeStatus();
 renderRunHistory();
 // Auto-dismiss hint after 8 seconds or first interaction
@@ -3466,6 +4496,7 @@ function connectWebSocket(){
   };
   wsConn.onclose=()=>{
     console.log('[WS] Disconnected');
+    stopRunWatchdog();
     wsLiveMode=false;
     setProgress(currentProgress||0,'Offline',lang==='zh'?'后端连接已断开，当前处于离线状态':'Backend disconnected, currently offline');
     setRunError(lang==='zh'?'后端连接已断开，请稍后重试。':'Backend connection lost. Please retry in a moment.');
@@ -3475,6 +4506,7 @@ function connectWebSocket(){
   };
   wsConn.onerror=()=>{
     console.log('[WS] Connection failed — standalone mode');
+    stopRunWatchdog();
     wsLiveMode=false;
     setProgress(currentProgress||0,'Offline',lang==='zh'?'WebSocket 连接失败，将回退到本地演示模式':'WebSocket connection failed, falling back to standalone mode');
     setRunError(lang==='zh'?'WebSocket 连接失败，当前处于离线演示模式。':'WebSocket connection failed. Currently in standalone demo mode.');
@@ -3500,6 +4532,7 @@ const EVENT_PHASE_MAP={
 // ═══ BACKEND-DRIVEN MODE: Event Queue + Sequential Processing ═══
 
 function handleBackendMessageQueued(msg){
+  if(msg.type!=='pong') lastBackendEventAt=Date.now();
   switch(msg.type){
     case 'war_started':
       currentRunError='';
@@ -3509,12 +4542,13 @@ function handleBackendMessageQueued(msg){
       if(msg.config.budget!==undefined) currentBudget=Number(msg.config.budget||currentBudget);
       if(msg.config.enable_search!==undefined) currentSearch=!!msg.config.enable_search;
       setProgress(3,'Deployment',lang==='zh'?'后端已开始运行 EvoHive':'Backend started EvoHive run');
-      setBroadcast(
-        lang==='zh'?'战役正式开始':'War is live',
-        lang==='zh'?`后端已经部署 ${msg.config.total} 个单位，观众可以开始跟踪阵营变化。`:`${msg.config.total} units are deployed. The audience can now track faction momentum.`,
-        lang==='zh'?'关注每一代结束时的最佳分数和冠军变化。':'Watch best-fitness jumps and champion changes at the end of each generation.',
-        lang==='zh'?'实时开战':'Live war'
-      );
+    setBroadcast(
+      lang==='zh'?'战役正式开始':'War is live',
+      lang==='zh'?`后端已经部署 ${msg.config.total} 个单位，观众可以开始跟踪阵营变化。`:`${msg.config.total} units are deployed. The audience can now track faction momentum.`,
+      lang==='zh'?'关注每一代结束时的最佳分数和冠军变化。':'Watch best-fitness jumps and champion changes at the end of each generation.',
+      lang==='zh'?'实时开战':'Live war',
+      'normal'
+    );
       updateRuntimeStatus();
       addKillFeed('LIVE: Evolution engine running','#00ff41');
       break;
@@ -3531,9 +4565,16 @@ function handleBackendMessageQueued(msg){
       if(!processingBackendEvents) processBackendQueue();
       break;
     case 'war_error':
+      stopRunWatchdog();
       addBattleLog(`Backend error: ${msg.error}`);
       setProgress(currentProgress,'Error',msg.error||'Unknown backend error');
       setRunError(msg.error||'Unknown backend error');
+      setBroadcast(
+        lang==='zh'?'战役中断':'War interrupted',
+        lang==='zh'?'后端在本轮运行中返回错误。':'The backend returned an error during this run.',
+        lang==='zh'?'建议检查模型可用性、预算和网络连接，然后重试。':'Check model availability, budget, and connectivity before retrying.',
+        lang==='zh'?'错误态':'Error state'
+      );
       saveRunHistoryEntry({
         problem: currentProblem,
         mode: currentMode,
@@ -3741,7 +4782,8 @@ async function processEvolutionEvent(msg){
       lang==='zh'?'Elo 锦标赛开始':'Elo tournament begins',
       lang==='zh'?'顶级单位正在通过面对面对战重排榜单。':'Top units are now reshuffling the board through direct duels.',
       lang==='zh'?'观众现在最值得看的是谁能在连续对局里守住连胜。':'The key spectator question is who can hold momentum across repeated rounds.',
-      lang==='zh'?'对战阶段':'Duel phase'
+      lang==='zh'?'对战阶段':'Duel phase',
+      'normal'
     );
     await announce();
     const alive=aliveAgents();
@@ -3891,7 +4933,8 @@ async function processEvolutionEvent(msg){
       lang==='zh'?'淘汰阶段正在重写战局':'Selection is rewriting the board',
       lang==='zh'?`${killed} 个单位被淘汰，${survived} 个单位继续存活。`:`${killed} units were eliminated and ${survived} remain alive.`,
       lang==='zh'?'这是观众最容易看出阵营差距和冠军稳定性的阶段。':'This is where faction gaps and champion stability become obvious.',
-      lang==='zh'?'生存洗牌':'Survival shake-up'
+      lang==='zh'?'生存洗牌':'Survival shake-up',
+      killed>=3?'peak':'normal'
     );
     addKillFeed(`Selection: ${killed} eliminated, ${survived} survived`,'#ff3333');
     addBattleLog(`Selection: keeping top ${survived} (${killed} eliminated)`);
@@ -4129,7 +5172,8 @@ async function processEvolutionEvent(msg){
       lang==='zh'?'红队攻击告一段落':'Red-team pressure wave complete',
       lang==='zh'?'顶级单位已经经历一轮脆弱性测试。':'The leading units have now survived a vulnerability check.',
       lang==='zh'?'接下来最值得关注的是冠军是否还能稳住优势。':'Now watch whether the champion can still hold the lead.',
-      lang==='zh'?'脆弱性检查':'Stress signal'
+      lang==='zh'?'脆弱性检查':'Stress signal',
+      'normal'
     );
     addKillFeed('Red team attack complete','#ff4444');
     await sleep(300);
@@ -4226,7 +5270,8 @@ async function processEvolutionEvent(msg){
       lang==='zh'?'冠军方案完成精炼':'Champion solution refined',
       lang==='zh'?'当前最佳单位已经进入最终锻造，答案质量正在上提。':'The leading unit has entered final refinement and the answer quality is being lifted.',
       lang==='zh'?'这通常是观众等待最终冠军定型的高潮节点。':'This is usually the climax where the audience waits for the final champion to lock in.',
-      lang==='zh'?'最终锻造':'Final forge'
+      lang==='zh'?'最终锻造':'Final forge',
+      'peak'
     );
     screenFlash('#ffd700',.15);
     addKillFeed('Refinement complete — champion forged','#ffd700');
@@ -4238,7 +5283,8 @@ async function processEvolutionEvent(msg){
       lang==='zh'?'最终冠军已经诞生':'The final champion is decided',
       lang==='zh'?'本次进化战争已经结束，观众可以查看最终答案和决策摘要。':'This evolution war is complete. The audience can now inspect the final answer and decision deck.',
       lang==='zh'?'从这里开始，重点从观战转向理解冠军方案为什么胜出。':'From here, the focus shifts from combat to understanding why the champion won.',
-      lang==='zh'?'终局时刻':'Endgame'
+      lang==='zh'?'终局时刻':'Endgame',
+      'peak'
     );
     screenFlash('#ffd700',.2);
     addKillFeed('EVOLUTION COMPLETE','#ffd700');
@@ -4261,7 +5307,8 @@ async function processGenSummary(data){
     lang==='zh'?`第 ${currentGen} 代结束`:`Generation ${currentGen} complete`,
     lang==='zh'?`最佳分数 ${Number(data.best_fitness||0).toFixed(2)}，平均分 ${Number(data.avg_fitness||0).toFixed(2)}。`:`Best score ${Number(data.best_fitness||0).toFixed(2)}, average ${Number(data.avg_fitness||0).toFixed(2)}.`,
     lang==='zh'?`当前存活 ${data.alive_count||'?'} 个单位。观众现在最值得看的是冠军是否继续领先。`:`${data.alive_count||'?'} units remain alive. The key question is whether the champion keeps the lead.`,
-    lang==='zh'?'代际总结':'Generation recap'
+    lang==='zh'?'代际总结':'Generation recap',
+    currentGen>=Math.max(2,GENS-1)?'peak':'normal'
   );
   addBattleLog(`=== Generation ${currentGen} complete ===`);
   addBattleLog(`  Best: ${Number(data.best_fitness||0).toFixed(2)} | Avg: ${Number(data.avg_fitness||0).toFixed(2)} | Alive: ${data.alive_count||'?'}`);
@@ -4273,11 +5320,12 @@ async function processGenSummary(data){
 }
 
 async function processWarComplete(results){
+  stopRunWatchdog();
   addBattleLog('========== EVOLUTION COMPLETE ==========');
   lastWarResults=results;
   if(results.problem) setCurrentProblem(results.problem);
   currentApiCalls=results.total_api_calls||0;
-  setProgress(100,lang==='zh'?'进化完成':'Evolution Complete',lang==='zh'?'最终结果已生成':'Final result package generated');
+  setProgress(100,lang==='zh'?'进化完成':'Evolution Complete',(results.evolved_answer||'').trim()?(lang==='zh'?'最终结果已生成':'Final result package generated'):t('finalPackagePending'));
   updateRuntimeStatus();
   saveRunHistoryEntry({
     problem: results.problem||currentProblem,

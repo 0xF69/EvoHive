@@ -11,8 +11,10 @@ import json
 import math
 import os
 import random
+import re
 import time
 import traceback
+import uuid
 from pathlib import Path
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -21,6 +23,133 @@ from fastapi.staticfiles import StaticFiles
 import uvicorn
 
 app = FastAPI(title="EvoHive War Server")
+
+ARTIFACT_ROOT = Path(__file__).parent / "evohive_runs"
+
+
+def _slug(text: str, max_len: int = 48) -> str:
+    slug = re.sub(r"[^a-zA-Z0-9]+", "-", (text or "run").strip().lower()).strip("-")
+    return (slug or "run")[:max_len].strip("-") or "run"
+
+
+def _split_answer_sections(answer: str) -> dict:
+    clean = (answer or "").strip()
+    if not clean:
+        return {"summary": "", "action_plan": [], "risks": []}
+
+    paragraphs = [p.strip() for p in re.split(r"\n\s*\n", clean) if p.strip()]
+    bullet_lines = []
+    for line in clean.splitlines():
+        stripped = line.strip()
+        if re.match(r"^([-*]|\d+[.)])\s+", stripped):
+            bullet_lines.append(re.sub(r"^([-*]|\d+[.)])\s+", "", stripped))
+
+    summary = paragraphs[0] if paragraphs else clean
+    risks = []
+    actions = []
+    for item in bullet_lines:
+        lower = item.lower()
+        if any(k in lower for k in ["risk", "constraint", "warning", "tradeoff", "caution", "limitation"]):
+            risks.append(item)
+        else:
+            actions.append(item)
+
+    if not actions and len(paragraphs) > 1:
+        actions = paragraphs[1:4]
+    if not risks:
+        risk_sentences = re.findall(r"[^.!?]*(?:risk|constraint|warning|tradeoff|limitation)[^.!?]*[.!?]", clean, flags=re.I)
+        risks = [s.strip() for s in risk_sentences[:3] if s.strip()]
+
+    return {
+        "summary": summary,
+        "action_plan": actions[:5],
+        "risks": risks[:3],
+    }
+
+
+def _build_structured_result(problem: str, answer: str, champion: dict, top5: list[dict]) -> dict:
+    parsed = _split_answer_sections(answer)
+    champion_label = champion.get("model") or champion.get("provider") or "unknown"
+    alternatives = []
+    for unit in top5[1:4]:
+        label = unit.get("model") or unit.get("provider") or unit.get("id") or "candidate"
+        elo = round(unit.get("elo", 0), 1)
+        alternatives.append(f"{label} finished behind the winner at ELO {elo}.")
+    return {
+        "executive_summary": parsed["summary"] or f"EvoHive produced a best answer for: {problem}",
+        "action_plan": parsed["action_plan"],
+        "risks": parsed["risks"],
+        "winner_reason": f"Top solution won because {champion_label} finished with the strongest final score and survived the post-evolution pipeline.",
+        "alternatives": alternatives,
+    }
+
+
+def _format_artifact_report(run_id: str, mode: str, results: dict, structured: dict) -> str:
+    lines = [
+        f"# EvoHive Web Run {run_id}",
+        "",
+        f"- Mode: {mode}",
+        f"- Problem: {results.get('problem', '')}",
+        f"- API Calls: {results.get('total_api_calls', 0)}",
+        f"- Estimated Cost: ${results.get('estimated_cost', 0):.4f}",
+        "",
+        "## Executive Summary",
+        "",
+        structured.get("executive_summary", ""),
+        "",
+        "## Winner Reason",
+        "",
+        structured.get("winner_reason", ""),
+        "",
+        "## Action Plan",
+        "",
+    ]
+    actions = structured.get("action_plan") or []
+    lines.extend([f"- {item}" for item in actions] or ["- No structured action plan extracted."])
+    lines.extend(["", "## Risks", ""])
+    risks = structured.get("risks") or []
+    lines.extend([f"- {item}" for item in risks] or ["- No explicit risks extracted."])
+    lines.extend(["", "## Final Answer", "", results.get("evolved_answer", "") or ""])
+    return "\n".join(lines).strip() + "\n"
+
+
+def _persist_run_artifact(run_id: str, mode: str, config: dict, results: dict, events: list[dict]) -> dict:
+    ARTIFACT_ROOT.mkdir(parents=True, exist_ok=True)
+    run_dir = ARTIFACT_ROOT / f"{run_id}-{_slug(results.get('problem', 'run'))}"
+    run_dir.mkdir(parents=True, exist_ok=True)
+
+    structured = _build_structured_result(
+        results.get("problem", ""),
+        results.get("evolved_answer", ""),
+        results.get("champion", {}),
+        results.get("top5", []),
+    )
+
+    payload = {
+        "run_id": run_id,
+        "mode": mode,
+        "config": config,
+        "results": results,
+        "structured_result": structured,
+        "event_count": len(events),
+    }
+
+    json_path = run_dir / "run.json"
+    events_path = run_dir / "events.json"
+    report_path = run_dir / "report.md"
+    json_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    events_path.write_text(json.dumps(events, ensure_ascii=False, indent=2), encoding="utf-8")
+    report_path.write_text(_format_artifact_report(run_id, mode, results, structured), encoding="utf-8")
+
+    return {
+        "run_id": run_id,
+        "dir": str(run_dir),
+        "json_path": str(json_path),
+        "events_path": str(events_path),
+        "report_path": str(report_path),
+        "structured_result": structured,
+    }
+
 
 # ── Serve frontend ──
 FRONTEND_PATH = Path(__file__).parent / "evohive-war.html"
@@ -216,6 +345,7 @@ async def run_real_evolution(ws: WebSocket, config: dict):
         on_status=on_status,
         emitter=emitter,
         budget_limit=budget,
+        save_results=False,
     )
 
     # Send war_complete with real results
@@ -261,20 +391,39 @@ async def run_real_evolution(ws: WebSocket, config: dict):
             "alive_count": gs.alive_count,
         })
 
+    results_payload = {
+        "problem": problem,
+        "champion": champion_data,
+        "total_api_calls": result.total_api_calls,
+        "estimated_cost": round(result.estimated_cost, 3),
+        "event_count": len(all_events),
+        "generations_data": generations_data,
+        "top5": top5_data if top5_data else [champion_data],
+        "evolved_answer": result.refined_top_solution or (
+            result.final_top_solutions[0].get("content", "") if result.final_top_solutions else ""
+        ),
+    }
+    artifact = _persist_run_artifact(
+        run_id=getattr(result, "id", uuid.uuid4().hex[:12]),
+        mode="real",
+        config={
+            "providers": providers,
+            "total": evo_config.population_size,
+            "gens": evo_config.generations,
+            "mode": mode,
+            "budget": budget,
+            "enable_search": enable_search,
+            "problem": problem,
+        },
+        results=results_payload,
+        events=all_events,
+    )
+    results_payload["structured_result"] = artifact["structured_result"]
+    results_payload["artifact"] = {k: v for k, v in artifact.items() if k != "structured_result"}
+
     await ws.send_json({
         "type": "war_complete",
-        "results": {
-            "problem": problem,
-            "champion": champion_data,
-            "total_api_calls": result.total_api_calls,
-            "estimated_cost": round(result.estimated_cost, 3),
-            "event_count": len(all_events),
-            "generations_data": generations_data,
-            "top5": top5_data if top5_data else [champion_data],
-            "evolved_answer": result.refined_top_solution or (
-                result.final_top_solutions[0].get("content", "") if result.final_top_solutions else ""
-            ),
-        }
+        "results": results_payload,
     })
 
 
@@ -575,25 +724,36 @@ async def run_mock_evolution(ws: WebSocket, config: dict):
                 total_api_calls=api_calls, estimated_cost=round(api_calls * 0.001, 3),
                 duration=round(time.time() % 1000, 1))
 
+    results_payload = {
+        "problem": config.get("problem", "Mock evolution test"),
+        "champion": champion.to_dict(),
+        "total_api_calls": api_calls,
+        "estimated_cost": round(api_calls * 0.001, 3),
+        "event_count": len(all_events),
+        "generations_data": generations_data,
+        "top5": [a.to_dict() for a in agents[:5]],
+        "evolved_answer": (
+            f"Final EvoHive mock answer for: {config.get('problem', 'Mock evolution test')}\n\n"
+            "1. Define a narrow target segment and position the offer around a measurable outcome.\n"
+            "2. Start with a low-friction entry tier to maximize adoption and feedback volume.\n"
+            "3. Reserve premium pricing for automation depth, team workflows, and advanced reliability.\n"
+            "4. Use battle-tested proof points, benchmarks, and before/after comparisons in the final pitch.\n"
+            "5. Keep iterating based on real user objections, not just internal assumptions."
+        ),
+    }
+    artifact = _persist_run_artifact(
+        run_id=f"mock-{uuid.uuid4().hex[:8]}",
+        mode="mock",
+        config=config,
+        results=results_payload,
+        events=all_events,
+    )
+    results_payload["structured_result"] = artifact["structured_result"]
+    results_payload["artifact"] = {k: v for k, v in artifact.items() if k != "structured_result"}
+
     await ws.send_json({
         "type": "war_complete",
-        "results": {
-            "problem": config.get("problem", "Mock evolution test"),
-            "champion": champion.to_dict(),
-            "total_api_calls": api_calls,
-            "estimated_cost": round(api_calls * 0.001, 3),
-            "event_count": len(all_events),
-            "generations_data": generations_data,
-            "top5": [a.to_dict() for a in agents[:5]],
-            "evolved_answer": (
-                f"Final EvoHive mock answer for: {config.get('problem', 'Mock evolution test')}\n\n"
-                "1. Define a narrow target segment and position the offer around a measurable outcome.\n"
-                "2. Start with a low-friction entry tier to maximize adoption and feedback volume.\n"
-                "3. Reserve premium pricing for automation depth, team workflows, and advanced reliability.\n"
-                "4. Use battle-tested proof points, benchmarks, and before/after comparisons in the final pitch.\n"
-                "5. Keep iterating based on real user objections, not just internal assumptions."
-            ),
-        }
+        "results": results_payload,
     })
 
 
