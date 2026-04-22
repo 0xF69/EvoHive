@@ -371,6 +371,38 @@ button:focus-visible,#lang-btn:focus-visible{outline:2px solid var(--gold);outli
 .cfg-history-btn:hover{border-color:var(--gold);color:var(--gold)}
 .cfg-history-btn.danger:hover{border-color:#ff6a6a;color:#ff6a6a}
 .cfg-history-empty{font-size:10px;color:var(--dim);line-height:1.6}
+.cfg-history-tag{display:inline-flex;align-items:center;gap:4px;padding:2px 6px;border-radius:999px;border:1px solid rgba(107,143,107,.22);font-size:8px;color:var(--gold);text-transform:uppercase;letter-spacing:.4px}
+.cfg-history-section{display:flex;flex-direction:column;gap:8px}
+.cfg-history-section-title{font-size:9px;color:var(--dim);letter-spacing:.8px;text-transform:uppercase}
+.cfg-history-divider{height:1px;background:rgba(107,143,107,.18);margin:4px 0}
+.cfg-history-item.remote{background:#071007}
+.cfg-history-item.remote .cfg-history-name{display:flex;align-items:center;gap:8px}
+.archive-modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.62);backdrop-filter:blur(8px);z-index:80;padding:24px}
+.archive-box{width:min(960px,100%);max-height:min(88vh,920px);overflow:hidden;display:flex;flex-direction:column;background:#081108;border:1px solid var(--border);border-radius:16px;box-shadow:0 28px 80px rgba(0,0,0,.45)}
+.archive-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;padding:18px 20px;border-bottom:1px solid rgba(107,143,107,.18);background:linear-gradient(180deg,rgba(255,215,0,.06),transparent)}
+.archive-title{font-family:'Press Start 2P',monospace;font-size:14px;color:var(--gold);line-height:1.5}
+.archive-sub{font-size:10px;color:var(--dim);line-height:1.6;margin-top:8px}
+.archive-close{border:1px solid rgba(107,143,107,.28);background:#0b140b;color:var(--text);border-radius:10px;padding:8px 12px;font-size:10px;cursor:pointer}
+.archive-close:hover{border-color:var(--gold);color:var(--gold)}
+.archive-body{padding:20px;overflow:auto}
+.archive-grid{display:grid;grid-template-columns:1.2fr .8fr;gap:16px}
+.archive-card{background:#0a150a;border:1px solid rgba(107,143,107,.22);border-radius:12px;padding:14px}
+.archive-card-title{font-size:10px;color:var(--gold);letter-spacing:.8px;text-transform:uppercase;margin-bottom:10px}
+.archive-copy{font-size:11px;line-height:1.7;color:var(--text)}
+.archive-list{display:flex;flex-direction:column;gap:8px}
+.archive-row{display:flex;justify-content:space-between;gap:12px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.05);font-size:10px}
+.archive-row:last-child{border-bottom:none;padding-bottom:0}
+.archive-row span:first-child{color:var(--dim)}
+.archive-event{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+.archive-event:last-child{border-bottom:none}
+.archive-event-ts{font-size:9px;color:var(--gold);min-width:72px}
+.archive-event-body{flex:1}
+.archive-event-title{font-size:10px;color:var(--text);text-transform:uppercase;letter-spacing:.6px}
+.archive-event-meta{font-size:9px;color:var(--dim);line-height:1.6;margin-top:4px;white-space:pre-wrap}
+.archive-chip-row{display:flex;flex-wrap:wrap;gap:8px}
+.archive-chip{padding:6px 8px;border-radius:999px;background:#0b140b;border:1px solid rgba(107,143,107,.22);font-size:9px;color:var(--text)}
+.archive-stack{display:flex;flex-direction:column;gap:12px}
+.archive-note{font-size:10px;color:var(--dim);line-height:1.6}
 .cfg-slider-row{display:flex;align-items:center;gap:12px}
 .cfg-slider-row input[type=range]{flex:1;accent-color:var(--gold);height:6px}
 .cfg-slider-val{font-family:'Press Start 2P',monospace;font-size:14px;color:var(--hp-high);min-width:40px;text-align:right}
@@ -836,6 +868,18 @@ button:focus-visible,#lang-btn:focus-visible{outline:2px solid var(--gold);outli
     </div>
   </div>
 </div>
+<div id="archive-modal" class="archive-modal">
+  <div class="archive-box">
+    <div class="archive-head">
+      <div>
+        <div class="archive-title" id="archive-title">RUN ARCHIVE</div>
+        <div class="archive-sub" id="archive-subtitle">Inspect persisted reports and replay timelines.</div>
+      </div>
+      <button id="archive-close" class="archive-close">CLOSE</button>
+    </div>
+    <div class="archive-body" id="archive-body"></div>
+  </div>
+</div>
 <script>
 /* ============================================================
    EVOHIVE WAR — Battle Royale Visualization
@@ -884,6 +928,7 @@ let broadcastHeadline='Awaiting deployment.';
 let broadcastSubline='Once the run starts, this layer will call out major swings, generation summaries, and champion changes.';
 let broadcastSummary='Generation summaries, best fitness jumps, and elimination shocks will be summarized here.';
 let lastChampionKey='';
+let remoteRunsCache=[];
 const RUN_HISTORY_KEY='evohive-run-history';
 const BRIEFING_STATE_KEY='evohive-briefing-state';
 const BRIEFING_SIZE_KEY='evohive-briefing-size';
@@ -1194,6 +1239,27 @@ function loadRunHistory(){
     return [];
   }
 }
+async function fetchRemoteRuns(){
+  try{
+    const resp=await fetch('/api/runs');
+    if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const payload=await resp.json();
+    remoteRunsCache=Array.isArray(payload.runs)?payload.runs:[];
+  }catch(e){
+    remoteRunsCache=[];
+  }
+  renderRunHistory();
+}
+async function fetchRunDetails(runId){
+  const resp=await fetch(`/api/runs/${encodeURIComponent(runId)}`);
+  if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  return resp.json();
+}
+async function fetchRunReplay(runId){
+  const resp=await fetch(`/api/runs/${encodeURIComponent(runId)}/replay`);
+  if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  return resp.json();
+}
 function saveRunHistoryEntry(entry){
   const history=loadRunHistory();
   history.unshift(entry);
@@ -1213,11 +1279,15 @@ function renderRunHistory(){
   const el=document.getElementById('cfg-history-list');
   if(!el) return;
   const history=loadRunHistory();
-  if(!history.length){
+  const remoteRuns=Array.isArray(remoteRunsCache)?remoteRunsCache:[];
+  if(!history.length&&!remoteRuns.length){
     el.innerHTML=`<div class="cfg-history-empty">${lang==='zh'?'还没有运行记录。完成一次任务后，这里会显示最近的 EvoHive runs。':'No runs yet. Complete a task and your recent EvoHive runs will appear here.'}</div>`;
     return;
   }
-  el.innerHTML=history.map((run,idx)=>`
+  const localHtml=history.length?`
+    <div class="cfg-history-section">
+      <div class="cfg-history-section-title">${lang==='zh'?'本地快捷记录':'Local quick history'}</div>
+      ${history.map((run,idx)=>`
     <div class="cfg-history-item" data-history-idx="${idx}">
       <div class="cfg-history-top">
         <div class="cfg-history-name">${(run.mode||'fast').toUpperCase()} · ${run.status||'complete'}</div>
@@ -1230,7 +1300,30 @@ function renderRunHistory(){
         <button class="cfg-history-btn danger" data-history-action="delete" data-history-idx="${idx}">${t('deleteRun')}</button>
       </div>
     </div>
-  `).join('');
+  `).join('')}
+    </div>`:'';
+  const remoteHtml=remoteRuns.length?`
+    <div class="cfg-history-divider"></div>
+    <div class="cfg-history-section">
+      <div class="cfg-history-section-title">${lang==='zh'?'后端归档 runs':'Persisted backend runs'}</div>
+      ${remoteRuns.map(run=>`
+        <div class="cfg-history-item remote" data-server-run-id="${run.run_id}">
+          <div class="cfg-history-top">
+            <div class="cfg-history-name">
+              ${(run.mode||'fast').toUpperCase()}
+              <span class="cfg-history-tag">${lang==='zh'?'归档':'archive'}</span>
+            </div>
+            <div class="cfg-history-meta">$${Number(run.estimated_cost||0).toFixed(2)}</div>
+          </div>
+          <div class="cfg-history-problem">${escapeHtml(run.problem||'')}</div>
+          <div class="cfg-history-actions">
+            <button class="cfg-history-btn" data-server-action="report" data-server-run-id="${run.run_id}">${lang==='zh'?'报告':'Report'}</button>
+            <button class="cfg-history-btn" data-server-action="replay" data-server-run-id="${run.run_id}">${lang==='zh'?'回放':'Replay'}</button>
+          </div>
+        </div>
+      `).join('')}
+    </div>`:'';
+  el.innerHTML=localHtml+remoteHtml;
 }
 
 function renderLaunchPresets(){
@@ -1279,6 +1372,131 @@ function renderConfigInsights(){
   providerSummaryEl.innerHTML=selectedList.length
     ? `<strong>${selectedList.length}</strong> ${lang==='zh'?'个阵营已加入战场。':'factions are on deck.'}<br>${previewNames}${overflow?` ${lang==='zh'?'等':'and'} +${overflow}`:''}`
     : (lang==='zh'?'还没有选择阵营。':'No factions selected yet.');
+}
+
+function openArchiveModal(title, subtitle, bodyHtml){
+  const modal=document.getElementById('archive-modal');
+  document.getElementById('archive-title').textContent=title;
+  document.getElementById('archive-subtitle').textContent=subtitle||'';
+  document.getElementById('archive-body').innerHTML=bodyHtml;
+  modal.style.display='flex';
+}
+
+function closeArchiveModal(){
+  const modal=document.getElementById('archive-modal');
+  if(modal) modal.style.display='none';
+}
+
+function formatReplayData(data){
+  if(data==null) return '—';
+  if(typeof data==='string') return data;
+  const summaryKeys=['message','round','generation','target','winner','done','total','best_fitness','avg_fitness','n_pairs'];
+  const picked=summaryKeys.filter(key=>data[key]!==undefined).map(key=>`${key}: ${data[key]}`);
+  if(picked.length) return picked.join('\n');
+  return JSON.stringify(data,null,2);
+}
+
+async function openRunReport(runId){
+  try{
+    const payload=await fetchRunDetails(runId);
+    const results=payload.results||{};
+    const structured=payload.structured_result||{};
+    const telemetry=payload.telemetry||{};
+    const phases=Object.entries(telemetry.phase_stats||{});
+    const providers=((telemetry.model_roster||{}).providers||[]).map(item=>`
+      <div class="archive-chip">${escapeHtml(item.name||item.provider)} · ${item.units||0}</div>
+    `).join('');
+    openArchiveModal(
+      `RUN ${runId}`,
+      results.problem||'',
+      `
+        <div class="archive-grid">
+          <div class="archive-stack">
+            <div class="archive-card">
+              <div class="archive-card-title">Executive Summary</div>
+              <div class="archive-copy">${escapeHtml(structured.executive_summary||results.problem||'')}</div>
+            </div>
+            <div class="archive-card">
+              <div class="archive-card-title">Recommendation</div>
+              <div class="archive-copy">${escapeHtml(structured.recommendation||structured.decision||'—')}</div>
+            </div>
+            <div class="archive-card">
+              <div class="archive-card-title">Action Plan</div>
+              <div class="archive-list">
+                ${(structured.action_plan||[]).length
+                  ? structured.action_plan.map(item=>`<div class="archive-copy">- ${escapeHtml(item)}</div>`).join('')
+                  : `<div class="archive-note">${lang==='zh'?'当前没有结构化行动项。':'No structured action plan was extracted.'}</div>`}
+              </div>
+            </div>
+            <div class="archive-card">
+              <div class="archive-card-title">Risk Watch</div>
+              <div class="archive-list">
+                ${(structured.risks||[]).length
+                  ? structured.risks.map(item=>`<div class="archive-copy">- ${escapeHtml(item)}</div>`).join('')
+                  : `<div class="archive-note">${lang==='zh'?'当前没有结构化风险项。':'No structured risks were extracted.'}</div>`}
+              </div>
+            </div>
+          </div>
+          <div class="archive-stack">
+            <div class="archive-card">
+              <div class="archive-card-title">Telemetry</div>
+              <div class="archive-list">
+                <div class="archive-row"><span>Mode</span><span>${escapeHtml(String(payload.mode||'').toUpperCase())}</span></div>
+                <div class="archive-row"><span>API Calls</span><span>${results.total_api_calls||0}</span></div>
+                <div class="archive-row"><span>Cost</span><span>$${Number(results.estimated_cost||0).toFixed(2)}</span></div>
+                <div class="archive-row"><span>Events</span><span>${telemetry.event_count||0}</span></div>
+                <div class="archive-row"><span>Generations</span><span>${telemetry.generation_count||0}</span></div>
+              </div>
+            </div>
+            <div class="archive-card">
+              <div class="archive-card-title">Providers</div>
+              <div class="archive-chip-row">${providers||`<div class="archive-note">${lang==='zh'?'当前没有 provider 统计。':'No provider roster was saved.'}</div>`}</div>
+            </div>
+            <div class="archive-card">
+              <div class="archive-card-title">Phase Durations</div>
+              <div class="archive-list">
+                ${phases.length
+                  ? phases.map(([phase,stat])=>`<div class="archive-row"><span>${escapeHtml(phase)}</span><span>${Number(stat.duration_sec||0).toFixed(2)}s · ${stat.count||0} events</span></div>`).join('')
+                  : `<div class="archive-note">${lang==='zh'?'当前没有阶段统计。':'No phase telemetry was saved.'}</div>`}
+              </div>
+            </div>
+          </div>
+        </div>
+      `
+    );
+  }catch(e){
+    showToast(lang==='zh'?'加载归档报告失败':'Failed to load archived report');
+  }
+}
+
+async function openRunReplay(runId){
+  try{
+    const replay=await fetchRunReplay(runId);
+    openArchiveModal(
+      `REPLAY ${runId}`,
+      lang==='zh'?'持久化关键事件时间线':'Persisted key event timeline',
+      `
+        <div class="archive-card">
+          <div class="archive-card-title">Replay Timeline</div>
+          <div class="archive-list">
+            ${Array.isArray(replay)&&replay.length
+              ? replay.map(event=>`
+                  <div class="archive-event">
+                    <div class="archive-event-ts">${Number(event.ts||0).toFixed(2)}</div>
+                    <div class="archive-event-body">
+                      <div class="archive-event-title">${escapeHtml(event.event_type||'event')} · ${escapeHtml(event.phase||'')}</div>
+                      <div class="archive-event-meta">${escapeHtml(formatReplayData(event.data))}</div>
+                    </div>
+                  </div>
+                `).join('')
+              : `<div class="archive-note">${lang==='zh'?'当前没有可回放事件。':'No replay events were stored for this run.'}</div>`}
+          </div>
+        </div>
+      `
+    );
+  }catch(e){
+    showToast(lang==='zh'?'加载回放失败':'Failed to load replay');
+  }
 }
 
 /* ---------- SECTION: CANVAS & RESIZE ---------- */
@@ -3437,6 +3655,13 @@ function buildChampionReasons(results,champion){
 }
 
 function buildExecutiveSummary(results,answerDeck,champion){
+  const structured=results.structured_result||{};
+  if(structured.executive_summary){
+    const parts=[structured.executive_summary];
+    if(structured.decision) parts.push(structured.decision);
+    if(structured.winner_reason) parts.push(structured.winner_reason);
+    return parts.filter(Boolean).slice(0,3);
+  }
   const parts=[];
   if(answerDeck.takeaway) parts.push(answerDeck.takeaway);
   if(champion){
@@ -3457,6 +3682,9 @@ function buildExecutiveSummary(results,answerDeck,champion){
 }
 
 function buildRecommendedNext(answerDeck,champion){
+  const structured=(lastWarResults&&lastWarResults.structured_result)||{};
+  if(structured.recommendation) return structured.recommendation;
+  if(Array.isArray(structured.next_steps)&&structured.next_steps.length) return structured.next_steps[0];
   if(answerDeck.actions.length) return answerDeck.actions[0];
   if(champion){
     return lang==='zh'
@@ -3483,6 +3711,8 @@ function buildAlternativeLosses(top5,champion){
 
 function buildRunReportText(){
   const results=lastWarResults||{};
+  const structured=results.structured_result||{};
+  const telemetry=results.telemetry||{};
   const champion=aliveAgents().sort((a,b)=>b.elo-a.elo)[0];
   const reasons=buildChampionReasons(results,champion);
   const top5=(Array.isArray(results.top5)&&results.top5.length?results.top5:aliveAgents().sort((a,b)=>b.elo-a.elo).slice(0,5));
@@ -3494,12 +3724,16 @@ function buildRunReportText(){
     `Search: ${currentSearch?'ON':'OFF'}`,
     `API Calls: ${results.total_api_calls||currentApiCalls||0}`,
     `Estimated Cost: $${Number(results.estimated_cost||0).toFixed(2)}`,
+    `Events: ${telemetry.event_count||results.event_count||0}`,
     ``,
     `Champion`,
     champion?`${champion.factionName} #${champion.id} | T${getTier(champion)} | ELO ${Math.round(champion.elo||0)}`:'No champion available',
     ``,
+    `Recommendation`,
+    structured.recommendation||buildRecommendedNext(extractAnswerDeck(results.evolved_answer||''),champion),
+    ``,
     `Why it won`,
-    ...(reasons.length?reasons:['No champion rationale available']),
+    ...(structured.winner_reason?[structured.winner_reason]:reasons.length?reasons:['No champion rationale available']),
     ``,
     `Final Answer`,
     (results.evolved_answer||'').trim()||'No final answer returned.',
@@ -3595,6 +3829,8 @@ function showResults(){
   const el=document.getElementById('results');
   const content=document.getElementById('res-content');
   const results=lastWarResults||{};
+  const structured=results.structured_result||{};
+  const telemetry=results.telemetry||{};
   const champion=aliveAgents().sort((a,b)=>b.elo-a.elo)[0];
   const alive=aliveAgents();
   const duration=((Date.now()-warStartTime)/1000).toFixed(0);
@@ -3665,12 +3901,20 @@ function showResults(){
   const answerDeck=extractAnswerDeck(evolvedAnswer);
   const executiveSummary=buildExecutiveSummary(results,answerDeck,champion);
   const nextStep=buildRecommendedNext(answerDeck,champion);
-  const actionsHtml=answerDeck.actions.length
-    ? answerDeck.actions.map(item=>`<div class="res-log-entry">${escapeHtml(item)}</div>`).join('')
+  const actionsSource=(structured.action_plan&&structured.action_plan.length)?structured.action_plan:answerDeck.actions;
+  const riskSource=(structured.risks&&structured.risks.length)?structured.risks:answerDeck.risks;
+  const actionsHtml=actionsSource.length
+    ? actionsSource.map(item=>`<div class="res-log-entry">${escapeHtml(item)}</div>`).join('')
     : `<div class="res-summary-text">${lang==='zh'?'当前没有提取到明确行动项。':'No concrete action items were extracted from this run.'}</div>`;
-  const risksHtml=answerDeck.risks.length
-    ? answerDeck.risks.map(item=>`<div class="res-log-entry">${escapeHtml(item)}</div>`).join('')
+  const risksHtml=riskSource.length
+    ? riskSource.map(item=>`<div class="res-log-entry">${escapeHtml(item)}</div>`).join('')
     : `<div class="res-summary-text">${lang==='zh'?'当前没有提取到显著风险提醒。':'No major risk notes were extracted from this run.'}</div>`;
+  const phaseStatsHtml=Object.entries(telemetry.phase_stats||{}).length
+    ? Object.entries(telemetry.phase_stats).map(([phase,stat])=>`<div class="res-list-row"><span>${escapeHtml(phase)}</span><span>${Number(stat.duration_sec||0).toFixed(1)}s · ${stat.count||0}</span></div>`).join('')
+    : `<div class="res-summary-text">${lang==='zh'?'当前没有阶段耗时遥测。':'No phase timing telemetry available for this run.'}</div>`;
+  const replayLinkHtml=results.artifact?.run_id
+    ? `<button class="res-action-btn" onclick="openRunReplay('${results.artifact.run_id}')">${lang==='zh'?'查看回放':'OPEN REPLAY'}</button>`
+    : '';
   let recentLogHtml='';
   if(recentLog.length){
     recentLogHtml=recentLog.map(entry=>`<div class="res-log-entry">[${escapeHtml(entry.time)}] ${escapeHtml(entry.msg)}</div>`).join('');
@@ -3707,7 +3951,7 @@ function showResults(){
               <div class="res-micro-row"><span>${t('runProgress')}</span><span>100%</span></div>
               <div class="res-micro-row"><span>${t('apiCalls')}</span><span>${apiCalls}</span></div>
               <div class="res-micro-row"><span>${t('cost')}</span><span>$${estCost.toFixed(2)}</span></div>
-              <div class="res-micro-row"><span>${t('generations')}</span><span>${GENS}</span></div>
+              <div class="res-micro-row"><span>${t('generations')}</span><span>${telemetry.generation_count||GENS}</span></div>
             </div>
           </div>
         </div>
@@ -3745,7 +3989,7 @@ function showResults(){
         <div class="res-section-title">${t('summaryDeck')}</div>
         <div class="res-list">
           <div class="res-list-row"><span>${t('keyTakeaway')}</span><span>${escapeHtml(answerDeck.takeaway||'—')}</span></div>
-          <div class="res-list-row"><span>${t('runSummary')}</span><span>${results.event_count||wsEventLog.length||0} events / ${GENS} gens</span></div>
+          <div class="res-list-row"><span>${t('runSummary')}</span><span>${telemetry.event_count||results.event_count||wsEventLog.length||0} events / ${telemetry.generation_count||GENS} gens</span></div>
           <div class="res-list-row"><span>${t('budgetLabel')}</span><span>$${Number(currentBudget||0).toFixed(1)}</span></div>
           <div class="res-list-row"><span>${t('apiCalls')}</span><span>${apiCalls}</span></div>
         </div>
@@ -3759,7 +4003,7 @@ function showResults(){
         <div class="res-list">
           <div class="res-list-row"><span>Population</span><span>${TOTAL}</span></div>
           <div class="res-list-row"><span>Providers</span><span>${[...selectedProviders].length}</span></div>
-          <div class="res-list-row"><span>Events</span><span>${results.event_count||wsEventLog.length||0}</span></div>
+          <div class="res-list-row"><span>Events</span><span>${telemetry.event_count||results.event_count||wsEventLog.length||0}</span></div>
           <div class="res-list-row"><span>Champion Tier</span><span>T${champion?getTier(champion):0}</span></div>
           <div class="res-list-row"><span>Mode</span><span>${String(currentMode||'fast').toUpperCase()}</span></div>
           <div class="res-list-row"><span>Search</span><span>${currentSearch?'ON':'OFF'}</span></div>
@@ -3772,13 +4016,9 @@ function showResults(){
         <div class="res-timeline">${generationHtml}</div>
       </div>
       <div class="res-summary-card">
-        <div class="res-section-title">${lang==='zh'?'配置摘要':'Config Summary'}</div>
+        <div class="res-section-title">${lang==='zh'?'阶段遥测':'Phase Telemetry'}</div>
         <div class="res-list">
-          <div class="res-list-row"><span>${t('modeLabel')}</span><span>${String(currentMode||'fast').toUpperCase()}</span></div>
-          <div class="res-list-row"><span>${t('budgetLabel')}</span><span>$${Number(currentBudget||0).toFixed(1)}</span></div>
-          <div class="res-list-row"><span>${t('searchLabel')}</span><span>${currentSearch?'ON':'OFF'}</span></div>
-          <div class="res-list-row"><span>${t('generations')}</span><span>${GENS}</span></div>
-          <div class="res-list-row"><span>Playback</span><span>${simSpeed}x</span></div>
+          ${phaseStatsHtml}
         </div>
       </div>
     </div>
@@ -3815,6 +4055,7 @@ function showResults(){
     <div class="res-action-rail">
       <button class="res-action-btn" onclick="copyCurrentAnswer()">${t('copyAnswer')}</button>
       <button class="res-action-btn" onclick="exportRunReport()">${t('exportReport')}</button>
+      ${replayLinkHtml}
       <button class="res-action-btn" onclick="document.getElementById('results').style.display='none';restartWar()">${t('restart')}</button>
     </div>
   `;
@@ -3941,6 +4182,13 @@ document.getElementById('cfg-providers').addEventListener('keydown',e=>{
   }
 });
 document.getElementById('cfg-history-list').addEventListener('click',e=>{
+  const serverActionBtn=e.target.closest('[data-server-action]');
+  if(serverActionBtn){
+    const runId=serverActionBtn.dataset.serverRunId;
+    if(serverActionBtn.dataset.serverAction==='report') openRunReport(runId);
+    if(serverActionBtn.dataset.serverAction==='replay') openRunReplay(runId);
+    return;
+  }
   const actionBtn=e.target.closest('[data-history-action]');
   const item=e.target.closest('.cfg-history-item');
   if(!item) return;
@@ -3968,6 +4216,10 @@ document.getElementById('cfg-history-list').addEventListener('click',e=>{
   if(actionBtn?.dataset.historyAction==='rerun'){
     document.getElementById('start-war-btn').click();
   }
+});
+document.getElementById('archive-close').addEventListener('click',closeArchiveModal);
+document.getElementById('archive-modal').addEventListener('click',e=>{
+  if(e.target.id==='archive-modal') closeArchiveModal();
 });
 document.getElementById('cfg-preset-grid').addEventListener('click',e=>{
   const btn=e.target.closest('[data-launch-preset]');
@@ -4437,6 +4689,7 @@ updateConfigSummary();
 renderConfigInsights();
 updateRuntimeStatus();
 renderRunHistory();
+fetchRemoteRuns();
 // Auto-dismiss hint after 8 seconds or first interaction
 let hintEl=document.getElementById('hint-overlay');
 if(hintEl){
@@ -5337,10 +5590,12 @@ async function processWarComplete(results){
     providers: [...selectedProviders],
     cost: Number(results.estimated_cost||0),
     apiCalls: results.total_api_calls||0,
+    runId: results.artifact?.run_id||'',
     status: currentRunError?'error':'complete',
     time: new Date().toLocaleString(),
   });
   renderRunHistory();
+  fetchRemoteRuns();
   addBattleLog(`API calls: ${results.total_api_calls||0} | Cost: $${Number(results.estimated_cost||0).toFixed(3)}`);
   addBattleLog(`Events: ${results.event_count||0}`);
   addKillFeed('EVOLUTION COMPLETE','#ffd700');
