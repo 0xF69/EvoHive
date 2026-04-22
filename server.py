@@ -17,14 +17,15 @@ import traceback
 import uuid
 from pathlib import Path
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 
 app = FastAPI(title="EvoHive War Server")
 
 ARTIFACT_ROOT = Path(__file__).parent / "evohive_runs"
+DEFAULT_REAL_RUN_TIMEOUT_SEC = int(os.environ.get("EVOHIVE_WEB_TIMEOUT_SEC", "1800"))
 
 
 def _slug(text: str, max_len: int = 48) -> str:
@@ -32,10 +33,24 @@ def _slug(text: str, max_len: int = 48) -> str:
     return (slug or "run")[:max_len].strip("-") or "run"
 
 
+def _now_ts() -> float:
+    return round(time.time(), 3)
+
+
+def _make_event_message(event_type: str, phase: str, data: dict) -> dict:
+    return {
+        "type": "evolution_event",
+        "event_type": event_type,
+        "phase": phase,
+        "ts": _now_ts(),
+        "data": data,
+    }
+
+
 def _split_answer_sections(answer: str) -> dict:
     clean = (answer or "").strip()
     if not clean:
-        return {"summary": "", "action_plan": [], "risks": []}
+        return {"summary": "", "action_plan": [], "risks": [], "recommendation": "", "next_steps": []}
 
     paragraphs = [p.strip() for p in re.split(r"\n\s*\n", clean) if p.strip()]
     bullet_lines = []
@@ -60,10 +75,15 @@ def _split_answer_sections(answer: str) -> dict:
         risk_sentences = re.findall(r"[^.!?]*(?:risk|constraint|warning|tradeoff|limitation)[^.!?]*[.!?]", clean, flags=re.I)
         risks = [s.strip() for s in risk_sentences[:3] if s.strip()]
 
+    recommendation = actions[0] if actions else summary
+    next_steps = actions[1:4] if len(actions) > 1 else paragraphs[1:4]
+
     return {
         "summary": summary,
         "action_plan": actions[:5],
         "risks": risks[:3],
+        "recommendation": recommendation,
+        "next_steps": next_steps[:3],
     }
 
 
@@ -71,20 +91,111 @@ def _build_structured_result(problem: str, answer: str, champion: dict, top5: li
     parsed = _split_answer_sections(answer)
     champion_label = champion.get("model") or champion.get("provider") or "unknown"
     alternatives = []
-    for unit in top5[1:4]:
+    for idx, unit in enumerate(top5[1:4], start=2):
         label = unit.get("model") or unit.get("provider") or unit.get("id") or "candidate"
         elo = round(unit.get("elo", 0), 1)
-        alternatives.append(f"{label} finished behind the winner at ELO {elo}.")
+        fitness = round(unit.get("fitness", 0), 3)
+        alternatives.append(f"#{idx} {label} finished behind the winner at ELO {elo} with fitness {fitness}.")
+    winner_reason = (
+        f"Top solution won because {champion_label} finished with the strongest final score "
+        f"and survived the post-evolution pipeline."
+    )
     return {
         "executive_summary": parsed["summary"] or f"EvoHive produced a best answer for: {problem}",
         "action_plan": parsed["action_plan"],
         "risks": parsed["risks"],
-        "winner_reason": f"Top solution won because {champion_label} finished with the strongest final score and survived the post-evolution pipeline.",
+        "winner_reason": winner_reason,
+        "recommendation": parsed["recommendation"] or winner_reason,
+        "next_steps": parsed["next_steps"],
+        "decision": f"Proceed with the {champion_label} champion response for: {problem}",
         "alternatives": alternatives,
     }
 
 
-def _format_artifact_report(run_id: str, mode: str, results: dict, structured: dict) -> str:
+def _build_phase_stats(events: list[dict]) -> dict:
+    phase_stats: dict[str, dict] = {}
+    for event in events:
+        phase = event.get("phase") or "unknown"
+        ts = float(event.get("ts") or 0.0)
+        stat = phase_stats.setdefault(phase, {"count": 0, "started_at": None, "ended_at": None})
+        stat["count"] += 1
+        if ts:
+            stat["started_at"] = ts if stat["started_at"] is None else min(stat["started_at"], ts)
+            stat["ended_at"] = ts if stat["ended_at"] is None else max(stat["ended_at"], ts)
+    for stat in phase_stats.values():
+        start = stat.get("started_at")
+        end = stat.get("ended_at")
+        stat["duration_sec"] = round(max(0.0, end - start), 3) if start and end else 0.0
+    return phase_stats
+
+
+def _build_model_roster(config: dict, results: dict) -> dict:
+    roster: dict[str, dict] = {}
+    configured = config.get("providers") or []
+    for provider in configured:
+        provider_meta = PROVIDERS.get(provider, {})
+        roster[provider] = {
+            "provider": provider,
+            "name": provider_meta.get("name", provider),
+            "configured": True,
+            "models": [],
+            "units": 0,
+        }
+
+    for unit in results.get("top5", []):
+        provider = unit.get("provider") or "unknown"
+        entry = roster.setdefault(provider, {
+            "provider": provider,
+            "name": PROVIDERS.get(provider, {}).get("name", provider),
+            "configured": provider in configured,
+            "models": [],
+            "units": 0,
+        })
+        model = unit.get("model")
+        if model and model not in entry["models"]:
+            entry["models"].append(model)
+        entry["units"] += 1
+    return {"providers": list(roster.values())}
+
+
+def _build_replay_summary(events: list[dict]) -> list[dict]:
+    interesting = {
+        "generation_started",
+        "evaluation_complete",
+        "elo_round_complete",
+        "selection_complete",
+        "crossover_complete",
+        "mutation_complete",
+        "red_team_attack",
+        "debate_round",
+        "refinement_complete",
+        "run_complete",
+    }
+    replay = []
+    for event in events:
+        if event.get("event_type") not in interesting:
+            continue
+        replay.append({
+            "ts": event.get("ts"),
+            "event_type": event.get("event_type"),
+            "phase": event.get("phase"),
+            "data": event.get("data", {}),
+        })
+    return replay
+
+
+def _build_run_telemetry(config: dict, results: dict, events: list[dict]) -> dict:
+    return {
+        "event_count": len(events),
+        "phase_stats": _build_phase_stats(events),
+        "model_roster": _build_model_roster(config, results),
+        "generation_count": len(results.get("generations_data") or []),
+        "api_calls": results.get("total_api_calls", 0),
+        "estimated_cost": results.get("estimated_cost", 0),
+    }
+
+
+def _format_artifact_report(run_id: str, mode: str, results: dict, structured: dict, telemetry: dict) -> str:
     lines = [
         f"# EvoHive Web Run {run_id}",
         "",
@@ -92,10 +203,15 @@ def _format_artifact_report(run_id: str, mode: str, results: dict, structured: d
         f"- Problem: {results.get('problem', '')}",
         f"- API Calls: {results.get('total_api_calls', 0)}",
         f"- Estimated Cost: ${results.get('estimated_cost', 0):.4f}",
+        f"- Event Count: {telemetry.get('event_count', 0)}",
         "",
         "## Executive Summary",
         "",
         structured.get("executive_summary", ""),
+        "",
+        "## Recommendation",
+        "",
+        structured.get("recommendation", ""),
         "",
         "## Winner Reason",
         "",
@@ -106,9 +222,15 @@ def _format_artifact_report(run_id: str, mode: str, results: dict, structured: d
     ]
     actions = structured.get("action_plan") or []
     lines.extend([f"- {item}" for item in actions] or ["- No structured action plan extracted."])
+    lines.extend(["", "## Next Steps", ""])
+    next_steps = structured.get("next_steps") or []
+    lines.extend([f"- {item}" for item in next_steps] or ["- No explicit next steps extracted."])
     lines.extend(["", "## Risks", ""])
     risks = structured.get("risks") or []
     lines.extend([f"- {item}" for item in risks] or ["- No explicit risks extracted."])
+    lines.extend(["", "## Alternatives", ""])
+    alternatives = structured.get("alternatives") or []
+    lines.extend([f"- {item}" for item in alternatives] or ["- No alternative summaries extracted."])
     lines.extend(["", "## Final Answer", "", results.get("evolved_answer", "") or ""])
     return "\n".join(lines).strip() + "\n"
 
@@ -124,6 +246,8 @@ def _persist_run_artifact(run_id: str, mode: str, config: dict, results: dict, e
         results.get("champion", {}),
         results.get("top5", []),
     )
+    telemetry = _build_run_telemetry(config, results, events)
+    replay = _build_replay_summary(events)
 
     payload = {
         "run_id": run_id,
@@ -131,23 +255,69 @@ def _persist_run_artifact(run_id: str, mode: str, config: dict, results: dict, e
         "config": config,
         "results": results,
         "structured_result": structured,
+        "telemetry": telemetry,
         "event_count": len(events),
     }
 
     json_path = run_dir / "run.json"
     events_path = run_dir / "events.json"
+    replay_path = run_dir / "replay.json"
+    telemetry_path = run_dir / "telemetry.json"
     report_path = run_dir / "report.md"
     json_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     events_path.write_text(json.dumps(events, ensure_ascii=False, indent=2), encoding="utf-8")
-    report_path.write_text(_format_artifact_report(run_id, mode, results, structured), encoding="utf-8")
+    replay_path.write_text(json.dumps(replay, ensure_ascii=False, indent=2), encoding="utf-8")
+    telemetry_path.write_text(json.dumps(telemetry, ensure_ascii=False, indent=2), encoding="utf-8")
+    report_path.write_text(_format_artifact_report(run_id, mode, results, structured, telemetry), encoding="utf-8")
 
     return {
         "run_id": run_id,
         "dir": str(run_dir),
         "json_path": str(json_path),
         "events_path": str(events_path),
+        "replay_path": str(replay_path),
+        "telemetry_path": str(telemetry_path),
         "report_path": str(report_path),
         "structured_result": structured,
+        "telemetry": telemetry,
+    }
+
+
+def _find_run_dir(run_id: str) -> Path | None:
+    if not ARTIFACT_ROOT.exists():
+        return None
+    candidates = sorted(
+        [path for path in ARTIFACT_ROOT.iterdir() if path.is_dir() and path.name.startswith(run_id)],
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )
+    return candidates[0] if candidates else None
+
+
+def _normalize_runtime_error(exc: Exception) -> dict:
+    if isinstance(exc, asyncio.TimeoutError):
+        return {
+            "error": "Evolution run exceeded the configured timeout.",
+            "error_code": "run_timeout",
+            "retryable": True,
+        }
+    if exc.__class__.__name__ == "BudgetExceededError":
+        return {
+            "error": str(exc),
+            "error_code": "budget_exceeded",
+            "retryable": True,
+        }
+    lowered = str(exc).lower()
+    if "pre-flight" in lowered or "unreachable" in lowered:
+        return {
+            "error": str(exc),
+            "error_code": "model_unavailable",
+            "retryable": True,
+        }
+    return {
+        "error": str(exc),
+        "error_code": "run_failed",
+        "retryable": False,
     }
 
 
@@ -162,6 +332,54 @@ async def index():
     if FRONTEND_PATH.exists():
         return FileResponse(FRONTEND_PATH, media_type="text/html")
     return HTMLResponse("<h1>evohive-war.html not found</h1>", status_code=404)
+
+
+@app.get("/api/runs")
+async def list_runs(limit: int = 20):
+    if not ARTIFACT_ROOT.exists():
+        return {"runs": []}
+    runs = []
+    for run_dir in sorted(
+        [path for path in ARTIFACT_ROOT.iterdir() if path.is_dir()],
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )[:limit]:
+        run_json = run_dir / "run.json"
+        if not run_json.exists():
+            continue
+        payload = json.loads(run_json.read_text(encoding="utf-8"))
+        runs.append({
+            "run_id": payload.get("run_id"),
+            "mode": payload.get("mode"),
+            "problem": payload.get("results", {}).get("problem", ""),
+            "estimated_cost": payload.get("results", {}).get("estimated_cost", 0),
+            "api_calls": payload.get("results", {}).get("total_api_calls", 0),
+            "dir": str(run_dir),
+            "updated_at": run_dir.stat().st_mtime,
+        })
+    return {"runs": runs}
+
+
+@app.get("/api/runs/{run_id}")
+async def get_run(run_id: str):
+    run_dir = _find_run_dir(run_id)
+    if run_dir is None:
+        raise HTTPException(status_code=404, detail="run not found")
+    run_json = run_dir / "run.json"
+    if not run_json.exists():
+        raise HTTPException(status_code=404, detail="run manifest not found")
+    return JSONResponse(content=json.loads(run_json.read_text(encoding="utf-8")))
+
+
+@app.get("/api/runs/{run_id}/replay")
+async def get_run_replay(run_id: str):
+    run_dir = _find_run_dir(run_id)
+    if run_dir is None:
+        raise HTTPException(status_code=404, detail="run not found")
+    replay_path = run_dir / "replay.json"
+    if not replay_path.exists():
+        raise HTTPException(status_code=404, detail="replay not found")
+    return JSONResponse(content=json.loads(replay_path.read_text(encoding="utf-8")))
 
 
 # ── Provider → LiteLLM model mapping ──
@@ -215,6 +433,7 @@ async def run_real_evolution(ws: WebSocket, config: dict):
     gens = config.get("gens", 2)
     mode = config.get("mode", "fast")
     budget = float(config.get("budget", 0.5) or 0.5)
+    run_timeout_sec = int(config.get("run_timeout_sec") or DEFAULT_REAL_RUN_TIMEOUT_SEC)
     enable_search = bool(config.get("enable_search", False))
     problem = config.get("problem",
         "Write a Python function `longest_palindrome(s: str) -> str` that "
@@ -279,6 +498,7 @@ async def run_real_evolution(ws: WebSocket, config: dict):
             "providers": providers,
             "problem": problem,
             "budget": budget,
+            "run_timeout_sec": run_timeout_sec,
             "enable_search": enable_search,
         }
     })
@@ -290,12 +510,7 @@ async def run_real_evolution(ws: WebSocket, config: dict):
 
     def on_event(event):
         """Synchronous callback from EventEmitter — queue for async send."""
-        msg = {
-            "type": "evolution_event",
-            "event_type": event.type,
-            "phase": event.phase,
-            "data": event.data,
-        }
+        msg = _make_event_message(event.type, event.phase, event.data)
         all_events.append(msg)
         # Schedule async send on the event loop
         try:
@@ -308,12 +523,7 @@ async def run_real_evolution(ws: WebSocket, config: dict):
 
     # Status callback
     def on_status(message: str):
-        msg = {
-            "type": "evolution_event",
-            "event_type": "status_update",
-            "phase": "info",
-            "data": {"message": message},
-        }
+        msg = _make_event_message("status_update", "info", {"message": message})
         all_events.append(msg)
         try:
             loop = asyncio.get_running_loop()
@@ -339,13 +549,16 @@ async def run_real_evolution(ws: WebSocket, config: dict):
     on_status(f"Starting REAL evolution with {len(thinker_models)} model(s): {', '.join(thinker_models)}")
     on_status(f"Problem: {problem[:100]}...")
 
-    result = await run_evolution(
-        config=evo_config,
-        on_generation_complete=on_gen_complete,
-        on_status=on_status,
-        emitter=emitter,
-        budget_limit=budget,
-        save_results=False,
+    result = await asyncio.wait_for(
+        run_evolution(
+            config=evo_config,
+            on_generation_complete=on_gen_complete,
+            on_status=on_status,
+            emitter=emitter,
+            budget_limit=budget,
+            save_results=False,
+        ),
+        timeout=run_timeout_sec,
     )
 
     # Send war_complete with real results
@@ -412,6 +625,7 @@ async def run_real_evolution(ws: WebSocket, config: dict):
             "gens": evo_config.generations,
             "mode": mode,
             "budget": budget,
+            "run_timeout_sec": run_timeout_sec,
             "enable_search": enable_search,
             "problem": problem,
         },
@@ -419,6 +633,7 @@ async def run_real_evolution(ws: WebSocket, config: dict):
         events=all_events,
     )
     results_payload["structured_result"] = artifact["structured_result"]
+    results_payload["telemetry"] = artifact["telemetry"]
     results_payload["artifact"] = {k: v for k, v in artifact.items() if k != "structured_result"}
 
     await ws.send_json({
@@ -486,7 +701,7 @@ async def run_mock_evolution(ws: WebSocket, config: dict):
 
     async def emit(event_type: str, phase: str, **data):
         nonlocal api_calls
-        msg = {"type": "evolution_event", "event_type": event_type, "phase": phase, "data": data}
+        msg = _make_event_message(event_type, phase, data)
         all_events.append(msg)
         try:
             await ws.send_json(msg)
@@ -749,6 +964,7 @@ async def run_mock_evolution(ws: WebSocket, config: dict):
         events=all_events,
     )
     results_payload["structured_result"] = artifact["structured_result"]
+    results_payload["telemetry"] = artifact["telemetry"]
     results_payload["artifact"] = {k: v for k, v in artifact.items() if k != "structured_result"}
 
     await ws.send_json({
@@ -772,7 +988,6 @@ def _has_real_keys() -> bool:
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
     await ws.accept()
-    real_mode = _has_real_keys()
     try:
         while True:
             data = await ws.receive_text()
@@ -783,6 +998,7 @@ async def websocket_endpoint(ws: WebSocket):
             if msg.get("type") == "start_war":
                 config = msg.get("config", {})
                 try:
+                    real_mode = _has_real_keys()
                     if real_mode:
                         print(f"[REAL MODE] Starting evolution with config: {config}", flush=True)
                         await run_real_evolution(ws, config)
@@ -791,8 +1007,15 @@ async def websocket_endpoint(ws: WebSocket):
                         await run_mock_evolution(ws, config)
                 except Exception as e:
                     tb = traceback.format_exc()
+                    err = _normalize_runtime_error(e)
                     print(f"Evolution error: {tb}")
-                    await ws.send_json({"type": "war_error", "error": str(e), "traceback": tb})
+                    await ws.send_json({
+                        "type": "war_error",
+                        "error": err["error"],
+                        "error_code": err["error_code"],
+                        "retryable": err["retryable"],
+                        "traceback": tb,
+                    })
 
             elif msg.get("type") == "ping":
                 await ws.send_json({"type": "pong"})
