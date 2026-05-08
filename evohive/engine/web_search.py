@@ -8,9 +8,7 @@
 """
 
 import os
-import json
-import asyncio
-from typing import Optional
+from contextvars import ContextVar
 
 try:
     import httpx
@@ -21,6 +19,25 @@ except ImportError:
 from evohive.engine.logger import get_logger
 
 _logger = get_logger("evohive.engine.web_search")
+_SESSION_SEARCH_API_KEYS: ContextVar[dict[str, str]] = ContextVar("evohive_session_search_api_keys", default={})
+
+
+def set_session_search_api_keys(api_keys: dict[str, str]):
+    """Attach per-run search API keys to the current async context."""
+    normalized = {
+        str(provider).strip().lower(): str(secret).strip()
+        for provider, secret in (api_keys or {}).items()
+        if str(provider).strip() and str(secret).strip()
+    }
+    return _SESSION_SEARCH_API_KEYS.set(normalized)
+
+
+def reset_session_search_api_keys(token) -> None:
+    _SESSION_SEARCH_API_KEYS.reset(token)
+
+
+def _search_api_key(provider: str, env_var: str) -> str:
+    return _SESSION_SEARCH_API_KEYS.get().get(provider, "") or os.environ.get(env_var, "")
 
 
 async def web_search(query: str, max_results: int = 5) -> list[dict]:
@@ -30,14 +47,14 @@ async def web_search(query: str, max_results: int = 5) -> list[dict]:
         List of {"title": str, "snippet": str, "url": str}
     """
     # Try Tavily first
-    tavily_key = os.environ.get("TAVILY_API_KEY", "")
+    tavily_key = _search_api_key("tavily", "TAVILY_API_KEY")
     if tavily_key and HAS_HTTPX:
         results = await _search_tavily(query, tavily_key, max_results)
         if results:
             return results
 
     # Try Serper
-    serper_key = os.environ.get("SERPER_API_KEY", "")
+    serper_key = _search_api_key("serper", "SERPER_API_KEY")
     if serper_key and HAS_HTTPX:
         results = await _search_serper(query, serper_key, max_results)
         if results:

@@ -101,8 +101,13 @@ class CostTracker:
         # 按 provider 汇总
         self._provider_costs: dict[str, float] = {}
         self._provider_calls: dict[str, int] = {}
+        self._provider_input_tokens: dict[str, int] = {}
+        self._provider_output_tokens: dict[str, int] = {}
         # 按 phase 汇总
         self._phase_costs: dict[str, float] = {}
+        self._phase_calls: dict[str, int] = {}
+        self._phase_input_tokens: dict[str, int] = {}
+        self._phase_output_tokens: dict[str, int] = {}
 
     # ── 属性访问 ──
 
@@ -179,11 +184,24 @@ class CostTracker:
             self._provider_calls[provider] = (
                 self._provider_calls.get(provider, 0) + 1
             )
+            self._provider_input_tokens[provider] = (
+                self._provider_input_tokens.get(provider, 0) + input_tokens
+            )
+            self._provider_output_tokens[provider] = (
+                self._provider_output_tokens.get(provider, 0) + output_tokens
+            )
 
             # 按 phase 汇总
             if phase:
                 self._phase_costs[phase] = (
                     self._phase_costs.get(phase, 0.0) + cost
+                )
+                self._phase_calls[phase] = self._phase_calls.get(phase, 0) + 1
+                self._phase_input_tokens[phase] = (
+                    self._phase_input_tokens.get(phase, 0) + input_tokens
+                )
+                self._phase_output_tokens[phase] = (
+                    self._phase_output_tokens.get(phase, 0) + output_tokens
                 )
 
             current_total = self._total_cost
@@ -193,6 +211,49 @@ class CostTracker:
             raise BudgetExceededError(current_total, self.budget_limit, cost)
 
         return cost
+
+    def snapshot(self) -> dict:
+        """Return a JSON-safe cost breakdown for APIs, artifacts, and tests."""
+        with self._lock:
+            provider_costs = dict(self._provider_costs)
+            provider_calls = dict(self._provider_calls)
+            provider_input_tokens = dict(self._provider_input_tokens)
+            provider_output_tokens = dict(self._provider_output_tokens)
+            phase_costs = dict(self._phase_costs)
+            phase_calls = dict(self._phase_calls)
+            phase_input_tokens = dict(self._phase_input_tokens)
+            phase_output_tokens = dict(self._phase_output_tokens)
+            total_cost = self._total_cost
+            total_input_tokens = self._total_input_tokens
+            total_output_tokens = self._total_output_tokens
+            total_calls = len(self._records)
+
+        providers = {
+            provider: {
+                "cost": cost,
+                "calls": provider_calls.get(provider, 0),
+                "input_tokens": provider_input_tokens.get(provider, 0),
+                "output_tokens": provider_output_tokens.get(provider, 0),
+            }
+            for provider, cost in provider_costs.items()
+        }
+        phases = {
+            phase: {
+                "cost": cost,
+                "calls": phase_calls.get(phase, 0),
+                "input_tokens": phase_input_tokens.get(phase, 0),
+                "output_tokens": phase_output_tokens.get(phase, 0),
+            }
+            for phase, cost in phase_costs.items()
+        }
+        return {
+            "total_cost": total_cost,
+            "total_calls": total_calls,
+            "total_input_tokens": total_input_tokens,
+            "total_output_tokens": total_output_tokens,
+            "providers": providers,
+            "phases": phases,
+        }
 
     def estimate_cost(
         self,
@@ -284,7 +345,12 @@ class CostTracker:
             self._total_output_tokens = 0
             self._provider_costs.clear()
             self._provider_calls.clear()
+            self._provider_input_tokens.clear()
+            self._provider_output_tokens.clear()
             self._phase_costs.clear()
+            self._phase_calls.clear()
+            self._phase_input_tokens.clear()
+            self._phase_output_tokens.clear()
 
 
 # ═══ 预估逻辑 (内部) ═══

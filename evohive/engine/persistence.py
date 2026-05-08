@@ -234,13 +234,118 @@ def format_markdown_report(run: EvolutionRun) -> str:
         lines.append(run.refined_top_solution)
         lines.append("")
 
+    # ── 验证报告 / Verification Report ──
+    verification = run.verification_report or {}
+    if verification:
+        summary = verification.get("summary", {})
+        lines.append("## Verification Report")
+        lines.append("")
+
+    claim_verification = run.claim_verification_report or {}
+    if claim_verification:
+        summary = claim_verification.get("summary", {})
+        lines.append("## Claim Verification Loop")
+        lines.append("")
+        lines.append(f"- **Claims Checked**: {claim_verification.get('claim_count', 0)}")
+        lines.append(f"- **Evidence Source**: {claim_verification.get('evidence_source', 'none')}")
+        lines.append(f"- **Needs External Verifier**: {summary.get('needs_external_verifier', 0)}")
+        lines.append(f"- **Average Support Score**: {summary.get('average_support_score', 0)}")
+        lines.append("")
+        lines.append(f"- **Claims**: {summary.get('claim_count', 0)}")
+        lines.append(f"- **High Risk Claims**: {summary.get('high_risk_claim_count', 0)}")
+        lines.append(f"- **Average Confidence**: {summary.get('average_confidence', 0)}")
+        lines.append("")
+        for claim in verification.get("claims", [])[:8]:
+            flags = ", ".join(claim.get("risk_flags", [])) or "none"
+            lines.append(
+                f"- **{claim.get('id', 'claim')}** "
+                f"({claim.get('kind', 'unknown')}, confidence={claim.get('confidence', 0)}): "
+                f"{claim.get('text', '')} _flags: {flags}_"
+            )
+        lines.append("")
+
+    # ── 血缘图摘要 / Lineage Graph Summary ──
+    lineage = run.lineage_graph or {}
+    if lineage:
+        summary = lineage.get("summary", {})
+        lines.append("## Lineage Graph")
+        lines.append("")
+        lines.append(f"- **Nodes**: {summary.get('node_count', 0)}")
+        lines.append(f"- **Edges**: {summary.get('edge_count', 0)}")
+        lines.append(f"- **Finalists**: {summary.get('finalist_count', 0)}")
+        lines.append(f"- **Mutated**: {summary.get('mutated_count', 0)}")
+        lines.append(f"- **Eliminated**: {summary.get('eliminated_count', 0)}")
+        lines.append("")
+
+    # ── 答案图谱 / Answer Graph ──
+    answer_graph = run.answer_graph or {}
+    if answer_graph:
+        summary = answer_graph.get("summary", {})
+        lines.append("## Answer Graph")
+        lines.append("")
+        lines.append(f"- **Nodes**: {summary.get('node_count', 0)}")
+        lines.append(f"- **Edges**: {summary.get('edge_count', 0)}")
+        lines.append(f"- **Answer Quantum Nodes**: {summary.get('solution_node_count', 0)}")
+        lines.append(f"- **Claim Nodes**: {summary.get('claim_node_count', 0)}")
+        lines.append(f"- **Verifier Nodes**: {summary.get('verifier_node_count', 0)}")
+        lines.append("")
+
     # ── 成本摘要 / Cost Summary ──
     lines.append("## Cost Summary")
     lines.append("")
     lines.append(f"- **Estimated Cost**: ${run.estimated_cost:.4f}")
     lines.append(f"- **Total API Calls**: {run.total_api_calls}")
     lines.append(f"- **Duration**: {duration_str}")
+    if run.resource_report:
+        lines.append(f"- **Runtime Seconds**: {run.resource_report.get('duration_sec', 0)}")
+        lines.append(f"- **Total Tokens**: {run.resource_report.get('total_tokens', 0):,}")
+        lines.append(f"- **Tokens / Sec**: {run.resource_report.get('tokens_per_sec', 0)}")
+    if run.token_budget_report:
+        lines.append(f"- **Token Budget Status**: {run.token_budget_report.get('status', 'unknown')}")
+        lines.append(f"- **Token Budget Usage**: {run.token_budget_report.get('usage_ratio', 0)}")
+        if run.token_budget_events:
+            lines.append(f"- **Runtime Budget Events**: {len(run.token_budget_events)}")
+    if run.cost_breakdown:
+        lines.append(f"- **Tracked LLM Calls**: {run.cost_breakdown.get('total_calls', 0)}")
+        lines.append(f"- **Input Tokens**: {run.cost_breakdown.get('total_input_tokens', 0):,}")
+        lines.append(f"- **Output Tokens**: {run.cost_breakdown.get('total_output_tokens', 0):,}")
+        providers = run.cost_breakdown.get("providers", {})
+        if providers:
+            lines.append("")
+            lines.append("### Cost By Provider")
+            lines.append("")
+            lines.append("| Provider | Calls | Input Tokens | Output Tokens | Cost |")
+            lines.append("|----------|-------|--------------|---------------|------|")
+            for provider, data in providers.items():
+                lines.append(
+                    f"| {provider} | {data.get('calls', 0)} | "
+                    f"{data.get('input_tokens', 0):,} | {data.get('output_tokens', 0):,} | "
+                    f"${data.get('cost', 0):.4f} |"
+                )
+        phases = run.cost_breakdown.get("phases", {})
+        if phases:
+            lines.append("")
+            lines.append("### Cost By Phase")
+            lines.append("")
+            lines.append("| Phase | Calls | Input Tokens | Output Tokens | Cost |")
+            lines.append("|-------|-------|--------------|---------------|------|")
+            for phase, data in phases.items():
+                lines.append(
+                    f"| {phase} | {data.get('calls', 0)} | "
+                    f"{data.get('input_tokens', 0):,} | {data.get('output_tokens', 0):,} | "
+                    f"${data.get('cost', 0):.4f} |"
+                )
     lines.append("")
+
+    # ── 轨迹摘要 / Trajectory Summary ──
+    if run.trajectory_summary:
+        lines.append("## Trajectory Summary")
+        lines.append("")
+        lines.append(f"- **Events**: {run.trajectory_summary.get('event_count', 0)}")
+        phases = run.trajectory_summary.get("phases", {})
+        if phases:
+            lines.append("- **Phases**: " + ", ".join(f"{k}={v}" for k, v in phases.items()))
+        lines.append("")
 
     return "\n".join(lines)
 

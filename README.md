@@ -26,7 +26,7 @@
 
 ### 事件流架构
 - 每个进化阶段发出结构化事件
-- 为前端 WebSocket 实时可视化做好准备
+- 供 CLI、SDK、服务端日志和后端集成消费
 - 30+ 种预定义事件类型
 
 ### Web Search 真实数据
@@ -44,6 +44,7 @@
 - 每次 API 调用实时记录 token 消耗和费用
 - 按 Provider / 阶段细分成本报表
 - `--budget` 设置预算上限，超出自动停止
+- 用户可切换 token 预算控制: `off` 保持完整流程，`auto` 自动省成本，`relaxed` 更偏质量，`strict` 更偏速度和低成本
 - 预运行成本估算
 
 ### 检查点与崩溃恢复
@@ -167,6 +168,8 @@ config = EvolutionConfig(
     thinker_models=["deepseek/deepseek-chat"],
     judge_models=["deepseek/deepseek-chat"],
     mode="deep",
+    token_budget_control="auto",  # off | auto | relaxed | strict
+    enable_token_budget_control=True,
 )
 
 result = asyncio.run(run_evolution(config, budget_limit=5.0))

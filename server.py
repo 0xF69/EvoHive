@@ -1,4 +1,4 @@
-"""EvoHive WebSocket Server — bridges frontend visualization to core engine.
+"""EvoHive backend server.
 
 Mock mode: simulates the full 13-phase evolution pipeline using the real
 event protocol, with fake LLM responses (no API keys needed).
@@ -8,29 +8,69 @@ Real mode: import the actual engine and run with real LLM calls.
 
 import asyncio
 import json
+import logging
 import math
 import os
 import random
 import re
 import time
-import traceback
 import uuid
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 
-app = FastAPI(title="EvoHive War Server")
+from evohive.server.providers import (
+    PROVIDER_ENV_VARS,
+    discover_provider_models_with_source as _discover_provider_models_with_source,
+    normalize_api_keys as _normalize_api_keys,
+    normalize_search_api_keys as _normalize_search_api_keys,
+    probe_manual_models as _probe_manual_models,
+    probe_provider_access as _probe_provider_access,
+    redact_config as _redact_config,
+)
+from evohive.server.artifacts import persist_run_artifact as _persist_run_artifact_impl
+from evohive.server.catalog import PROVIDER_MODEL_MAP, PROVIDERS
+from evohive.server.costing import (
+    estimate_model_unit_rate as _estimate_model_unit_rate,
+    estimate_run_cost,
+    provider_models_for_config as _provider_models_for_config,
+)
+from evohive.server.schemas import (
+    ProviderModelCheckRequest,
+    ProviderModelDiscoverRequest,
+    ProviderPreflightRequest,
+    RunEstimateRequest,
+)
+from evohive.engine.answer_graph import build_answer_graph
+from evohive.engine.claim_verifier import build_claim_verification_report
+from evohive.engine.effort import normalize_token_budget_control
+from evohive.engine.token_budget import build_token_budget_report
+from evohive.engine.trajectory_replay import build_trajectory_replay
+from evohive.engine.verification import build_verification_report
 
+app = FastAPI(title="EvoHive Backend Server")
+logger = logging.getLogger("evohive.server")
+
+FRONTEND_DIR = Path(__file__).parent / "frontend"
+FRONTEND_INDEX = FRONTEND_DIR / "index.html"
 ARTIFACT_ROOT = Path(__file__).parent / "evohive_runs"
+CHECKPOINT_DIR = Path(__file__).parent / "evohive_checkpoints"
 DEFAULT_REAL_RUN_TIMEOUT_SEC = int(os.environ.get("EVOHIVE_WEB_TIMEOUT_SEC", "1800"))
+RUN_ID_RE = re.compile(r"^[A-Za-z0-9_-]{3,80}$")
+
+if FRONTEND_DIR.exists():
+    app.mount("/assets", StaticFiles(directory=FRONTEND_DIR), name="frontend_assets")
 
 
-def _slug(text: str, max_len: int = 48) -> str:
-    slug = re.sub(r"[^a-zA-Z0-9]+", "-", (text or "run").strip().lower()).strip("-")
-    return (slug or "run")[:max_len].strip("-") or "run"
+class BudgetGuardError(Exception):
+    """Raised when a run is likely to exceed the configured budget."""
+
+
+class ClientMessageError(ValueError):
+    """Raised when a WebSocket client sends an invalid control message."""
 
 
 def _now_ts() -> float:
@@ -47,247 +87,82 @@ def _make_event_message(event_type: str, phase: str, data: dict) -> dict:
     }
 
 
-def _split_answer_sections(answer: str) -> dict:
-    clean = (answer or "").strip()
-    if not clean:
-        return {"summary": "", "action_plan": [], "risks": [], "recommendation": "", "next_steps": []}
+def _enforce_budget_guard(config: dict | None) -> dict:
+    estimate = estimate_run_cost(config)
+    if estimate["risk"] != "safe" and not bool((config or {}).get("allow_budget_override")):
+        raise BudgetGuardError(
+            f"Estimated cost ${estimate['low']:.2f}-${estimate['high']:.2f} may exceed the configured budget "
+            f"(${estimate['budget']:.2f})."
+        )
+    return estimate
 
-    paragraphs = [p.strip() for p in re.split(r"\n\s*\n", clean) if p.strip()]
-    bullet_lines = []
-    for line in clean.splitlines():
-        stripped = line.strip()
-        if re.match(r"^([-*]|\d+[.)])\s+", stripped):
-            bullet_lines.append(re.sub(r"^([-*]|\d+[.)])\s+", "", stripped))
 
-    summary = paragraphs[0] if paragraphs else clean
-    risks = []
-    actions = []
-    for item in bullet_lines:
-        lower = item.lower()
-        if any(k in lower for k in ["risk", "constraint", "warning", "tradeoff", "caution", "limitation"]):
-            risks.append(item)
-        else:
-            actions.append(item)
+def _resolve_token_budget_settings(config: dict | None) -> dict:
+    cfg = config or {}
+    raw_control = cfg.get("token_budget_control", cfg.get("budget_control", ""))
+    enabled_flag = bool(cfg.get("enable_token_budget_control", False))
+    control = normalize_token_budget_control(str(raw_control or ""), enabled=enabled_flag)
+    if control == "off":
+        enabled_flag = False
+    else:
+        enabled_flag = True
 
-    if not actions and len(paragraphs) > 1:
-        actions = paragraphs[1:4]
-    if not risks:
-        risk_sentences = re.findall(r"[^.!?]*(?:risk|constraint|warning|tradeoff|limitation)[^.!?]*[.!?]", clean, flags=re.I)
-        risks = [s.strip() for s in risk_sentences[:3] if s.strip()]
-
-    recommendation = actions[0] if actions else summary
-    next_steps = actions[1:4] if len(actions) > 1 else paragraphs[1:4]
+    try:
+        multiplier = float(cfg.get("token_budget_multiplier", 1.0) or 1.0)
+    except (TypeError, ValueError):
+        multiplier = 1.0
+    multiplier = min(max(multiplier, 0.1), 10.0)
 
     return {
-        "summary": summary,
-        "action_plan": actions[:5],
-        "risks": risks[:3],
-        "recommendation": recommendation,
-        "next_steps": next_steps[:3],
+        "mode": control,
+        "enabled": enabled_flag,
+        "multiplier": multiplier,
+        "options": ["off", "auto", "relaxed", "strict"],
     }
-
-
-def _build_structured_result(problem: str, answer: str, champion: dict, top5: list[dict]) -> dict:
-    parsed = _split_answer_sections(answer)
-    champion_label = champion.get("model") or champion.get("provider") or "unknown"
-    alternatives = []
-    for idx, unit in enumerate(top5[1:4], start=2):
-        label = unit.get("model") or unit.get("provider") or unit.get("id") or "candidate"
-        elo = round(unit.get("elo", 0), 1)
-        fitness = round(unit.get("fitness", 0), 3)
-        alternatives.append(f"#{idx} {label} finished behind the winner at ELO {elo} with fitness {fitness}.")
-    winner_reason = (
-        f"Top solution won because {champion_label} finished with the strongest final score "
-        f"and survived the post-evolution pipeline."
-    )
-    return {
-        "executive_summary": parsed["summary"] or f"EvoHive produced a best answer for: {problem}",
-        "action_plan": parsed["action_plan"],
-        "risks": parsed["risks"],
-        "winner_reason": winner_reason,
-        "recommendation": parsed["recommendation"] or winner_reason,
-        "next_steps": parsed["next_steps"],
-        "decision": f"Proceed with the {champion_label} champion response for: {problem}",
-        "alternatives": alternatives,
-    }
-
-
-def _build_phase_stats(events: list[dict]) -> dict:
-    phase_stats: dict[str, dict] = {}
-    for event in events:
-        phase = event.get("phase") or "unknown"
-        ts = float(event.get("ts") or 0.0)
-        stat = phase_stats.setdefault(phase, {"count": 0, "started_at": None, "ended_at": None})
-        stat["count"] += 1
-        if ts:
-            stat["started_at"] = ts if stat["started_at"] is None else min(stat["started_at"], ts)
-            stat["ended_at"] = ts if stat["ended_at"] is None else max(stat["ended_at"], ts)
-    for stat in phase_stats.values():
-        start = stat.get("started_at")
-        end = stat.get("ended_at")
-        stat["duration_sec"] = round(max(0.0, end - start), 3) if start and end else 0.0
-    return phase_stats
-
-
-def _build_model_roster(config: dict, results: dict) -> dict:
-    roster: dict[str, dict] = {}
-    configured = config.get("providers") or []
-    for provider in configured:
-        provider_meta = PROVIDERS.get(provider, {})
-        roster[provider] = {
-            "provider": provider,
-            "name": provider_meta.get("name", provider),
-            "configured": True,
-            "models": [],
-            "units": 0,
-        }
-
-    for unit in results.get("top5", []):
-        provider = unit.get("provider") or "unknown"
-        entry = roster.setdefault(provider, {
-            "provider": provider,
-            "name": PROVIDERS.get(provider, {}).get("name", provider),
-            "configured": provider in configured,
-            "models": [],
-            "units": 0,
-        })
-        model = unit.get("model")
-        if model and model not in entry["models"]:
-            entry["models"].append(model)
-        entry["units"] += 1
-    return {"providers": list(roster.values())}
-
-
-def _build_replay_summary(events: list[dict]) -> list[dict]:
-    interesting = {
-        "generation_started",
-        "evaluation_complete",
-        "elo_round_complete",
-        "selection_complete",
-        "crossover_complete",
-        "mutation_complete",
-        "red_team_attack",
-        "debate_round",
-        "refinement_complete",
-        "run_complete",
-    }
-    replay = []
-    for event in events:
-        if event.get("event_type") not in interesting:
-            continue
-        replay.append({
-            "ts": event.get("ts"),
-            "event_type": event.get("event_type"),
-            "phase": event.get("phase"),
-            "data": event.get("data", {}),
-        })
-    return replay
-
-
-def _build_run_telemetry(config: dict, results: dict, events: list[dict]) -> dict:
-    return {
-        "event_count": len(events),
-        "phase_stats": _build_phase_stats(events),
-        "model_roster": _build_model_roster(config, results),
-        "generation_count": len(results.get("generations_data") or []),
-        "api_calls": results.get("total_api_calls", 0),
-        "estimated_cost": results.get("estimated_cost", 0),
-    }
-
-
-def _format_artifact_report(run_id: str, mode: str, results: dict, structured: dict, telemetry: dict) -> str:
-    lines = [
-        f"# EvoHive Web Run {run_id}",
-        "",
-        f"- Mode: {mode}",
-        f"- Problem: {results.get('problem', '')}",
-        f"- API Calls: {results.get('total_api_calls', 0)}",
-        f"- Estimated Cost: ${results.get('estimated_cost', 0):.4f}",
-        f"- Event Count: {telemetry.get('event_count', 0)}",
-        "",
-        "## Executive Summary",
-        "",
-        structured.get("executive_summary", ""),
-        "",
-        "## Recommendation",
-        "",
-        structured.get("recommendation", ""),
-        "",
-        "## Winner Reason",
-        "",
-        structured.get("winner_reason", ""),
-        "",
-        "## Action Plan",
-        "",
-    ]
-    actions = structured.get("action_plan") or []
-    lines.extend([f"- {item}" for item in actions] or ["- No structured action plan extracted."])
-    lines.extend(["", "## Next Steps", ""])
-    next_steps = structured.get("next_steps") or []
-    lines.extend([f"- {item}" for item in next_steps] or ["- No explicit next steps extracted."])
-    lines.extend(["", "## Risks", ""])
-    risks = structured.get("risks") or []
-    lines.extend([f"- {item}" for item in risks] or ["- No explicit risks extracted."])
-    lines.extend(["", "## Alternatives", ""])
-    alternatives = structured.get("alternatives") or []
-    lines.extend([f"- {item}" for item in alternatives] or ["- No alternative summaries extracted."])
-    lines.extend(["", "## Final Answer", "", results.get("evolved_answer", "") or ""])
-    return "\n".join(lines).strip() + "\n"
 
 
 def _persist_run_artifact(run_id: str, mode: str, config: dict, results: dict, events: list[dict]) -> dict:
-    ARTIFACT_ROOT.mkdir(parents=True, exist_ok=True)
-    run_dir = ARTIFACT_ROOT / f"{run_id}-{_slug(results.get('problem', 'run'))}"
-    run_dir.mkdir(parents=True, exist_ok=True)
-
-    structured = _build_structured_result(
-        results.get("problem", ""),
-        results.get("evolved_answer", ""),
-        results.get("champion", {}),
-        results.get("top5", []),
+    return _persist_run_artifact_impl(
+        ARTIFACT_ROOT,
+        PROVIDERS,
+        run_id,
+        mode,
+        config,
+        results,
+        events,
     )
-    telemetry = _build_run_telemetry(config, results, events)
-    replay = _build_replay_summary(events)
 
-    payload = {
-        "run_id": run_id,
-        "mode": mode,
-        "config": config,
-        "results": results,
-        "structured_result": structured,
-        "telemetry": telemetry,
-        "event_count": len(events),
-    }
 
-    json_path = run_dir / "run.json"
-    events_path = run_dir / "events.json"
-    replay_path = run_dir / "replay.json"
-    telemetry_path = run_dir / "telemetry.json"
-    report_path = run_dir / "report.md"
-    json_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-    events_path.write_text(json.dumps(events, ensure_ascii=False, indent=2), encoding="utf-8")
-    replay_path.write_text(json.dumps(replay, ensure_ascii=False, indent=2), encoding="utf-8")
-    telemetry_path.write_text(json.dumps(telemetry, ensure_ascii=False, indent=2), encoding="utf-8")
-    report_path.write_text(_format_artifact_report(run_id, mode, results, structured, telemetry), encoding="utf-8")
+async def _persist_run_artifact_async(run_id: str, mode: str, config: dict, results: dict, events: list[dict]) -> dict:
+    return await asyncio.to_thread(_persist_run_artifact, run_id, mode, config, results, events)
 
-    return {
-        "run_id": run_id,
-        "dir": str(run_dir),
-        "json_path": str(json_path),
-        "events_path": str(events_path),
-        "replay_path": str(replay_path),
-        "telemetry_path": str(telemetry_path),
-        "report_path": str(report_path),
-        "structured_result": structured,
-        "telemetry": telemetry,
-    }
+
+def _validate_run_id(run_id: str) -> str:
+    clean = str(run_id or "").strip()
+    if not RUN_ID_RE.fullmatch(clean):
+        raise HTTPException(status_code=400, detail="invalid run_id")
+    return clean
+
+
+def _read_json_file(path: Path) -> dict | list:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=500, detail=f"corrupt JSON artifact: {path.name}") from exc
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=f"could not read artifact: {path.name}") from exc
+
+
+async def _read_json_file_async(path: Path) -> dict | list:
+    return await asyncio.to_thread(_read_json_file, path)
 
 
 def _find_run_dir(run_id: str) -> Path | None:
+    run_id = _validate_run_id(run_id)
     if not ARTIFACT_ROOT.exists():
         return None
     candidates = sorted(
-        [path for path in ARTIFACT_ROOT.iterdir() if path.is_dir() and path.name.startswith(run_id)],
+        [path for path in ARTIFACT_ROOT.iterdir() if path.is_dir() and path.name.startswith(f"{run_id}-")],
         key=lambda path: path.stat().st_mtime,
         reverse=True,
     )
@@ -295,6 +170,12 @@ def _find_run_dir(run_id: str) -> Path | None:
 
 
 def _normalize_runtime_error(exc: Exception) -> dict:
+    if isinstance(exc, ClientMessageError):
+        return {
+            "error": str(exc),
+            "error_code": "invalid_message",
+            "retryable": False,
+        }
     if isinstance(exc, asyncio.TimeoutError):
         return {
             "error": "Evolution run exceeded the configured timeout.",
@@ -302,6 +183,12 @@ def _normalize_runtime_error(exc: Exception) -> dict:
             "retryable": True,
         }
     if exc.__class__.__name__ == "BudgetExceededError":
+        return {
+            "error": str(exc),
+            "error_code": "budget_exceeded",
+            "retryable": True,
+        }
+    if isinstance(exc, BudgetGuardError):
         return {
             "error": str(exc),
             "error_code": "budget_exceeded",
@@ -321,21 +208,50 @@ def _normalize_runtime_error(exc: Exception) -> dict:
     }
 
 
-# ── Serve frontend ──
-FRONTEND_PATH = Path(__file__).parent / "evohive-war.html"
-if not FRONTEND_PATH.exists():
-    FRONTEND_PATH = Path(__file__).parent / "output" / "evohive-war.html"
+def _make_ws_error_payload(exc: Exception, config: dict | None = None) -> dict:
+    err = _normalize_runtime_error(exc)
+    error_id = f"err-{uuid.uuid4().hex[:10]}"
+    payload = {
+        "type": "war_error",
+        "error": err["error"],
+        "error_code": err["error_code"],
+        "retryable": err["retryable"],
+        "error_id": error_id,
+    }
+    if err["error_code"] == "budget_exceeded":
+        payload["budget_estimate"] = estimate_run_cost(config or {})
+    return payload
+
+
+def _service_metadata() -> dict:
+    return {
+        "service": "EvoHive Backend",
+        "status": "ok",
+        "endpoints": {
+            "frontend": "/",
+            "websocket": "/ws",
+            "runs": "/api/runs",
+            "estimate": "/api/runs/estimate",
+            "provider_preflight": "/api/providers/preflight",
+            "provider_model_check": "/api/providers/model-check",
+        },
+    }
 
 
 @app.api_route("/", methods=["GET", "HEAD"])
-async def index():
-    if FRONTEND_PATH.exists():
-        return FileResponse(FRONTEND_PATH, media_type="text/html")
-    return HTMLResponse("<h1>evohive-war.html not found</h1>", status_code=404)
+async def frontend_index():
+    if FRONTEND_INDEX.exists():
+        return FileResponse(FRONTEND_INDEX)
+    return _service_metadata()
+
+
+@app.api_route("/api/status", methods=["GET", "HEAD"])
+async def backend_index():
+    return _service_metadata()
 
 
 @app.get("/api/runs")
-async def list_runs(limit: int = 20):
+async def list_runs(limit: int = Query(20, ge=1, le=100)):
     if not ARTIFACT_ROOT.exists():
         return {"runs": []}
     runs = []
@@ -347,7 +263,14 @@ async def list_runs(limit: int = 20):
         run_json = run_dir / "run.json"
         if not run_json.exists():
             continue
-        payload = json.loads(run_json.read_text(encoding="utf-8"))
+        try:
+            payload = await _read_json_file_async(run_json)
+        except HTTPException as exc:
+            logger.warning("Skipping unreadable run manifest %s: %s", run_json, exc.detail)
+            continue
+        if not isinstance(payload, dict):
+            logger.warning("Skipping non-object run manifest %s", run_json)
+            continue
         runs.append({
             "run_id": payload.get("run_id"),
             "mode": payload.get("mode"),
@@ -368,7 +291,7 @@ async def get_run(run_id: str):
     run_json = run_dir / "run.json"
     if not run_json.exists():
         raise HTTPException(status_code=404, detail="run manifest not found")
-    return JSONResponse(content=json.loads(run_json.read_text(encoding="utf-8")))
+    return JSONResponse(content=await _read_json_file_async(run_json))
 
 
 @app.get("/api/runs/{run_id}/replay")
@@ -379,43 +302,176 @@ async def get_run_replay(run_id: str):
     replay_path = run_dir / "replay.json"
     if not replay_path.exists():
         raise HTTPException(status_code=404, detail="replay not found")
-    return JSONResponse(content=json.loads(replay_path.read_text(encoding="utf-8")))
+    return JSONResponse(content=await _read_json_file_async(replay_path))
 
 
-# ── Provider → LiteLLM model mapping ──
-PROVIDER_MODEL_MAP = {
-    "openai":      ["openai/gpt-4o-mini", "openai/gpt-4o"],
-    "anthropic":   ["anthropic/claude-3-5-haiku-20241022", "anthropic/claude-sonnet-4-20250514"],
-    "gemini":      ["gemini/gemini-2.0-flash", "gemini/gemini-2.5-flash"],
-    "deepseek":    ["deepseek/deepseek-chat"],
-    "groq":        ["groq/llama-3.3-70b-versatile"],
-    "mistral":     ["mistral/mistral-large-latest"],
-    "xai":         ["xai/grok-2"],
-    "zhipuai":     ["zhipuai/glm-4-plus"],
-    "siliconflow": ["siliconflow/Qwen/Qwen2.5-72B-Instruct"],
-}
+@app.get("/api/runs/{run_id}/answer-graph")
+async def get_run_answer_graph(run_id: str):
+    run_dir = _find_run_dir(run_id)
+    if run_dir is None:
+        raise HTTPException(status_code=404, detail="run not found")
+    run_json = run_dir / "run.json"
+    if not run_json.exists():
+        raise HTTPException(status_code=404, detail="run manifest not found")
+    payload = await _read_json_file_async(run_json)
+    answer_graph = (payload.get("results") or {}).get("answer_graph")
+    if not answer_graph:
+        raise HTTPException(status_code=404, detail="answer graph not found")
+    return JSONResponse(content=answer_graph)
 
-PROVIDERS = {
-    "openai": {"color": "#e2e8f0", "name": "OpenAI", "models": ["gpt-4o", "gpt-4o-mini", "o3-mini"]},
-    "anthropic": {"color": "#d4a574", "name": "Anthropic", "models": ["claude-sonnet-4-20250514", "claude-3-5-haiku-20241022"]},
-    "gemini": {"color": "#34d399", "name": "Google Gemini", "models": ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.0-flash"]},
-    "deepseek": {"color": "#4a9eff", "name": "DeepSeek", "models": ["deepseek-chat", "deepseek-reasoner"]},
-    "groq": {"color": "#f97316", "name": "Groq", "models": ["llama-3.3-70b-versatile"]},
-    "mistral": {"color": "#7c3aed", "name": "Mistral", "models": ["mistral-large-latest"]},
-    "xai": {"color": "#ec4899", "name": "xAI (Grok)", "models": ["grok-2"]},
-    "together": {"color": "#06b6d4", "name": "Together AI", "models": ["Llama-3.3-70B-Turbo"]},
-    "fireworks": {"color": "#ef4444", "name": "Fireworks AI", "models": ["llama-v3.3-70b"]},
-    "cohere": {"color": "#10b981", "name": "Cohere", "models": ["command-r-plus"]},
-    "zhipuai": {"color": "#a855f7", "name": "ZhipuAI", "models": ["glm-4-plus"]},
-    "siliconflow": {"color": "#22d3ee", "name": "SiliconFlow", "models": ["Qwen/Qwen2.5-72B-Instruct"]},
-    "moonshot": {"color": "#f59e0b", "name": "Moonshot (Kimi)", "models": ["moonshot-v1-auto"]},
-    "baichuan": {"color": "#ef4444", "name": "Baichuan", "models": ["Baichuan4"]},
-    "yi": {"color": "#8b5cf6", "name": "Yi", "models": ["yi-large"]},
-    "perplexity": {"color": "#3b82f6", "name": "Perplexity", "models": ["sonar-pro"]},
-    "dashscope": {"color": "#f97316", "name": "DashScope", "models": ["qwen-max"]},
-    "volcengine": {"color": "#22c55e", "name": "Volcengine", "models": ["doubao-pro-256k"]},
-    "minimax": {"color": "#d946ef", "name": "Minimax", "models": ["MiniMax-Text-01"]},
-}
+
+@app.get("/api/runs/{run_id}/trajectory-replay")
+async def get_run_trajectory_replay(run_id: str):
+    run_dir = _find_run_dir(run_id)
+    if run_dir is None:
+        raise HTTPException(status_code=404, detail="run not found")
+    run_json = run_dir / "run.json"
+    if not run_json.exists():
+        raise HTTPException(status_code=404, detail="run manifest not found")
+    payload = await _read_json_file_async(run_json)
+    results = payload.get("results") or {}
+    replay = results.get("trajectory_replay")
+    if not replay:
+        replay = build_trajectory_replay(results.get("trajectory_log") or [])
+    return JSONResponse(content=replay)
+
+
+@app.get("/api/runs/{run_id}/claim-verification")
+async def get_run_claim_verification(run_id: str):
+    run_dir = _find_run_dir(run_id)
+    if run_dir is None:
+        raise HTTPException(status_code=404, detail="run not found")
+    run_json = run_dir / "run.json"
+    if not run_json.exists():
+        raise HTTPException(status_code=404, detail="run manifest not found")
+    payload = await _read_json_file_async(run_json)
+    report = (payload.get("results") or {}).get("claim_verification_report")
+    if not report:
+        raise HTTPException(status_code=404, detail="claim verification not found")
+    return JSONResponse(content=report)
+
+
+@app.get("/api/checkpoints")
+async def get_checkpoints():
+    from evohive.engine.checkpoint import list_checkpoints
+
+    return {
+        "checkpoints": await asyncio.to_thread(
+            list_checkpoints,
+            str(CHECKPOINT_DIR),
+        )
+    }
+
+
+@app.get("/api/checkpoints/{run_id}")
+async def get_checkpoint(run_id: str):
+    from evohive.engine.checkpoint import load_checkpoint
+
+    run_id = _validate_run_id(run_id)
+    checkpoint = await asyncio.to_thread(load_checkpoint, run_id, str(CHECKPOINT_DIR))
+    if checkpoint is None:
+        raise HTTPException(status_code=404, detail="checkpoint not found")
+    return JSONResponse(content=checkpoint)
+
+
+@app.post("/api/provider-models/discover")
+async def discover_provider_models(payload: ProviderModelDiscoverRequest):
+    provider = payload.provider.strip().lower()
+    api_key = payload.api_key.strip()
+    if provider not in PROVIDER_ENV_VARS:
+        raise HTTPException(status_code=400, detail="unsupported provider")
+    models, source = await _discover_provider_models_with_source(provider, api_key)
+    return {
+        "provider": provider,
+        "models": models,
+        "source": source,
+    }
+
+
+@app.post("/api/runs/estimate")
+async def estimate_run(payload: RunEstimateRequest):
+    config = payload.model_dump()
+    estimate = estimate_run_cost(config)
+    token_budget = _resolve_token_budget_settings(config)
+    return {
+        "estimate": estimate,
+        "guarded": estimate["risk"] == "safe" or bool(config.get("allow_budget_override")),
+        "token_budget_control": token_budget,
+    }
+
+
+@app.post("/api/providers/model-check")
+async def provider_model_check(payload: ProviderModelCheckRequest):
+    provider = payload.provider.strip().lower()
+    api_key = _normalize_api_keys({provider: payload.api_key}).get(provider, "")
+    models = [str(model).strip() for model in payload.models if str(model).strip()]
+    result = await _probe_manual_models(provider, api_key, models)
+    return result
+
+
+@app.post("/api/providers/preflight")
+async def provider_preflight(payload: ProviderPreflightRequest):
+    providers = _normalize_selected_providers(payload.providers) if payload.providers else []
+    api_keys = _normalize_api_keys(payload.api_keys)
+    results = []
+    for provider in providers:
+        results.append(await _probe_provider_access(provider, api_keys.get(provider, "")))
+    ready = [item for item in results if item["ok"]]
+    return {
+        "providers": results,
+        "ready": len(ready) > 0,
+        "ready_count": len(ready),
+    }
+
+
+def _normalize_selected_providers(raw_providers) -> list[str]:
+    """Return a non-empty, de-duplicated provider list.
+
+    EvoHive optimizes answers, not provider rankings, so one provider is a
+    valid run: the selected model can spawn the whole agent population.
+    """
+    providers: list[str] = []
+    for provider in raw_providers or ["deepseek"]:
+        normalized = str(provider or "").strip().lower()
+        if not normalized:
+            continue
+        if normalized not in PROVIDER_MODEL_MAP and normalized not in PROVIDERS:
+            continue
+        if normalized not in providers:
+            providers.append(normalized)
+    return providers or ["deepseek"]
+
+
+def _format_litellm_model(provider: str, model: str) -> str:
+    model_id = str(model or "").strip()
+    if not model_id:
+        return ""
+    first_segment = model_id.split("/", 1)[0]
+    known_litellm_prefixes = set(PROVIDER_MODEL_MAP) | {"together_ai", "fireworks_ai"}
+    if first_segment in known_litellm_prefixes:
+        return model_id
+    return f"{provider}/{model_id}"
+
+
+def _build_litellm_model_pool(providers: list[str], provider_models_map: dict | None = None) -> list[str]:
+    """Build the model pool used by the engine.
+
+    With a single provider/model this intentionally returns one model. The
+    engine then creates many thinkers from that same model, producing many
+    competing solution agents for the user's task.
+    """
+    model_pool: list[str] = []
+    explicit_map = provider_models_map or {}
+    for provider in _normalize_selected_providers(providers):
+        explicit_models = explicit_map.get(provider)
+        if isinstance(explicit_models, list) and explicit_models:
+            for model in explicit_models:
+                formatted = _format_litellm_model(provider, model)
+                if formatted:
+                    model_pool.append(formatted)
+        elif provider in PROVIDER_MODEL_MAP:
+            model_pool.extend(PROVIDER_MODEL_MAP[provider])
+    return list(dict.fromkeys(model_pool)) or ["deepseek/deepseek-chat"]
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -427,30 +483,37 @@ async def run_real_evolution(ws: WebSocket, config: dict):
     from evohive.models import EvolutionConfig
     from evohive.engine.evolution import run_evolution
     from evohive.engine.events import EventEmitter
+    from evohive.engine.web_search import reset_session_search_api_keys, set_session_search_api_keys
+    from evohive.llm.provider import reset_session_api_keys, set_session_api_keys
 
-    providers = config.get("providers", ["deepseek"])
+    providers = _normalize_selected_providers(config.get("providers", ["deepseek"]))
     total = config.get("total", 15)
     gens = config.get("gens", 2)
     mode = config.get("mode", "fast")
+    reasoning_effort = config.get("reasoning_effort") or mode
     budget = float(config.get("budget", 0.5) or 0.5)
+    token_budget = _resolve_token_budget_settings(config)
     run_timeout_sec = int(config.get("run_timeout_sec") or DEFAULT_REAL_RUN_TIMEOUT_SEC)
+    resume_from = str(config.get("resume_from") or "").strip() or None
     enable_search = bool(config.get("enable_search", False))
+    session_api_keys = _normalize_api_keys(config.get("api_keys"))
+    session_search_api_keys = _normalize_search_api_keys(config.get("search_api_keys"))
+    safe_config = _redact_config(config)
     problem = config.get("problem",
         "Write a Python function `longest_palindrome(s: str) -> str` that "
         "returns the longest palindromic substring in s. "
         "Handle edge cases. Optimize for O(n^2) or better."
     )
 
-    # Collect LiteLLM model strings from selected providers
-    thinker_models = []
-    for p in providers:
-        if p in PROVIDER_MODEL_MAP:
-            thinker_models.extend(PROVIDER_MODEL_MAP[p])
-    if not thinker_models:
-        thinker_models = ["deepseek/deepseek-chat"]
+    provider_models_map = config.get("provider_models") or {}
+    budget_estimate = _enforce_budget_guard(config)
+
+    # One model is enough: it will spawn many independent solution agents.
+    thinker_models = _build_litellm_model_pool(providers, provider_models_map)
 
     # Use the first model as primary, rest as multi-model pool
     primary_model = thinker_models[0]
+    single_model_mode = len(thinker_models) == 1
 
     # Default judge dimensions (same as sdk.py _DEFAULT_DIMENSIONS)
     default_dimensions = [
@@ -486,6 +549,10 @@ async def run_real_evolution(ws: WebSocket, config: dict):
         enable_adaptive=True,
         # Mode
         mode=mode,
+        reasoning_effort=reasoning_effort,
+        token_budget_control=token_budget["mode"],
+        token_budget_multiplier=token_budget["multiplier"],
+        enable_token_budget_control=token_budget["enabled"],
     )
 
     # Send war_started
@@ -495,11 +562,17 @@ async def run_real_evolution(ws: WebSocket, config: dict):
             "total": evo_config.population_size,
             "gens": evo_config.generations,
             "mode": "REAL",
+            "reasoning_effort": evo_config.reasoning_effort,
+            "token_budget_control": token_budget,
             "providers": providers,
             "problem": problem,
             "budget": budget,
+            "budget_estimate": budget_estimate,
             "run_timeout_sec": run_timeout_sec,
+            "resume_from": resume_from,
             "enable_search": enable_search,
+            "model_pool_size": len(thinker_models),
+            "single_model_mode": single_model_mode,
         }
     })
 
@@ -546,20 +619,31 @@ async def run_real_evolution(ws: WebSocket, config: dict):
             pass
 
     # Run the real engine
-    on_status(f"Starting REAL evolution with {len(thinker_models)} model(s): {', '.join(thinker_models)}")
+    if single_model_mode:
+        on_status(f"Starting REAL single-model evolution: {thinker_models[0]} will spawn {evo_config.population_size} agents.")
+    else:
+        on_status(f"Starting REAL multi-model evolution with {len(thinker_models)} model(s): {', '.join(thinker_models)}")
     on_status(f"Problem: {problem[:100]}...")
 
-    result = await asyncio.wait_for(
-        run_evolution(
-            config=evo_config,
-            on_generation_complete=on_gen_complete,
-            on_status=on_status,
-            emitter=emitter,
-            budget_limit=budget,
-            save_results=False,
-        ),
-        timeout=run_timeout_sec,
-    )
+    llm_key_token = set_session_api_keys(session_api_keys)
+    search_key_token = set_session_search_api_keys(session_search_api_keys)
+    try:
+        result = await asyncio.wait_for(
+            run_evolution(
+                config=evo_config,
+                on_generation_complete=on_gen_complete,
+                on_status=on_status,
+                emitter=emitter,
+                budget_limit=budget,
+                save_results=False,
+                resume_from=resume_from,
+                checkpoint_dir=str(CHECKPOINT_DIR),
+            ),
+            timeout=run_timeout_sec,
+        )
+    finally:
+        reset_session_search_api_keys(search_key_token)
+        reset_session_api_keys(llm_key_token)
 
     # Send war_complete with real results
     elapsed = time.time() - start_time
@@ -609,6 +693,23 @@ async def run_real_evolution(ws: WebSocket, config: dict):
         "champion": champion_data,
         "total_api_calls": result.total_api_calls,
         "estimated_cost": round(result.estimated_cost, 3),
+        "cost_breakdown": result.cost_breakdown,
+        "resource_report": result.resource_report,
+        "token_budget_control": {
+            **token_budget,
+            "effective_enabled": result.config.enable_token_budget_control,
+            "effective_multiplier": result.config.token_budget_multiplier,
+        },
+        "token_budget_plan": result.token_budget_plan,
+        "token_budget_report": result.token_budget_report,
+        "token_budget_events": result.token_budget_events,
+        "trajectory_log": result.trajectory_log,
+        "trajectory_summary": result.trajectory_summary,
+        "trajectory_replay": result.trajectory_replay,
+        "lineage_graph": result.lineage_graph,
+        "verification_report": result.verification_report,
+        "claim_verification_report": result.claim_verification_report,
+        "answer_graph": result.answer_graph,
         "event_count": len(all_events),
         "generations_data": generations_data,
         "top5": top5_data if top5_data else [champion_data],
@@ -616,18 +717,28 @@ async def run_real_evolution(ws: WebSocket, config: dict):
             result.final_top_solutions[0].get("content", "") if result.final_top_solutions else ""
         ),
     }
-    artifact = _persist_run_artifact(
+    artifact = await _persist_run_artifact_async(
         run_id=getattr(result, "id", uuid.uuid4().hex[:12]),
         mode="real",
         config={
+            **safe_config,
             "providers": providers,
             "total": evo_config.population_size,
             "gens": evo_config.generations,
             "mode": mode,
+            "reasoning_effort": result.reasoning_effort,
+            "token_budget_control": {
+                **token_budget,
+                "effective_enabled": result.config.enable_token_budget_control,
+                "effective_multiplier": result.config.token_budget_multiplier,
+            },
             "budget": budget,
             "run_timeout_sec": run_timeout_sec,
+            "resume_from": resume_from,
             "enable_search": enable_search,
             "problem": problem,
+            "model_pool_size": len(thinker_models),
+            "single_model_mode": single_model_mode,
         },
         results=results_payload,
         events=all_events,
@@ -684,10 +795,12 @@ class MockAgent:
 
 async def run_mock_evolution(ws: WebSocket, config: dict):
     """Run a full mock evolution pipeline, emitting events over WebSocket."""
-    providers = config.get("providers", ["deepseek", "gemini"])
+    safe_config = _redact_config(config)
+    providers = _normalize_selected_providers(config.get("providers", ["deepseek", "gemini"]))
     total = config.get("total", 30)
     gens = config.get("gens", 3)
     mode = config.get("mode", "standard")
+    reasoning_effort = config.get("reasoning_effort") or mode
 
     SURVIVAL_RATE = 0.2
     ELITE_RATE = 0.05
@@ -698,6 +811,7 @@ async def run_mock_evolution(ws: WebSocket, config: dict):
     MockAgent._counter = 0
     api_calls = 0
     all_events = []
+    mock_started_at = time.perf_counter()
 
     async def emit(event_type: str, phase: str, **data):
         nonlocal api_calls
@@ -714,12 +828,22 @@ async def run_mock_evolution(ws: WebSocket, config: dict):
 
     await ws.send_json({
         "type": "war_started",
-        "config": {"total": total, "gens": gens, "mode": mode, "providers": providers}
+        "config": {
+            "total": total,
+            "gens": gens,
+            "mode": mode,
+            "reasoning_effort": reasoning_effort,
+            "providers": providers,
+            "single_model_mode": len(providers) == 1,
+        }
     })
     await asyncio.sleep(0.5)
 
     await emit("preflight_ok", "init", models=[f"{PROVIDERS[p]['name']}/{PROVIDERS[p]['models'][0]}" for p in providers if p in PROVIDERS])
-    await status(f"Pre-flight check passed: {len(providers)} provider(s) reachable.")
+    if len(providers) == 1:
+        await status(f"Single-model evolution ready: {PROVIDERS[providers[0]]['name']} will generate the full agent population.")
+    else:
+        await status(f"Pre-flight check passed: {len(providers)} provider(s) reachable.")
     api_calls += len(providers)
 
     agents = []
@@ -935,6 +1059,109 @@ async def run_mock_evolution(ws: WebSocket, config: dict):
             "alive_count": total,
         })
 
+    evolved_answer = (
+        f"Final EvoHive mock answer for: {config.get('problem', 'Mock evolution test')}\n\n"
+        "1. Define a narrow target segment and position the offer around a measurable outcome.\n"
+        "2. Start with a low-friction entry tier to maximize adoption and feedback volume.\n"
+        "3. Reserve premium pricing for automation depth, team workflows, and advanced reliability.\n"
+        "4. Use battle-tested proof points, benchmarks, and before/after comparisons in the final pitch.\n"
+        "5. Keep iterating based on real user objections, not just internal assumptions."
+    )
+    lineage_graph = {
+        "nodes": [
+            {"id": agent.id, "generation": agent.gen, "fitness": round(agent.fitness, 3)}
+            for agent in agents[:5]
+        ],
+        "edges": [],
+        "summary": {
+            "node_count": min(5, len(agents)),
+            "edge_count": 0,
+            "finalist_count": min(5, len(agents)),
+        },
+    }
+    verification_report = build_verification_report(
+        problem=config.get("problem", "Mock evolution test"),
+        final_answer=evolved_answer,
+        lineage_graph=lineage_graph,
+    )
+    claim_verification_report = build_claim_verification_report(
+        verification_report=verification_report,
+        search_context="",
+    )
+    answer_graph = build_answer_graph(
+        problem=config.get("problem", "Mock evolution test"),
+        final_answer=evolved_answer,
+        lineage_graph=lineage_graph,
+        verification_report=verification_report,
+        top_solutions=[a.to_dict() for a in agents[:5]],
+    )
+    mock_duration = max(0.0, time.perf_counter() - mock_started_at)
+    mock_input_tokens = api_calls * 100
+    mock_output_tokens = api_calls * 50
+    mock_total_tokens = mock_input_tokens + mock_output_tokens
+    resource_report = {
+        "version": "resource-report.v1",
+        "duration_sec": round(mock_duration, 4),
+        "llm_calls": api_calls,
+        "input_tokens": mock_input_tokens,
+        "output_tokens": mock_output_tokens,
+        "total_tokens": mock_total_tokens,
+        "estimated_cost": round(api_calls * 0.001, 3),
+        "tokens_per_sec": round(mock_total_tokens / mock_duration, 2) if mock_duration > 0 else 0.0,
+        "cost_per_1k_tokens": round((api_calls * 0.001) / (mock_total_tokens / 1000), 6)
+        if mock_total_tokens > 0 else 0.0,
+        "phases": {},
+        "generations": generations_data,
+    }
+    token_budget_plan = {
+        "version": "token-budget-plan.v1",
+        "reasoning_effort": reasoning_effort,
+        "total_token_budget": max(4000, total * gens * 1500),
+        "phase_budgets": {"mock": max(4000, total * gens * 1500)},
+        "policy": {"soft_limit": True, "recommend_stop_at": 0.9, "hard_stop_at": 1.15},
+    }
+    token_budget_report = build_token_budget_report(
+        plan=token_budget_plan,
+        resource_report={
+            **resource_report,
+            "phases": {
+                "mock": {
+                    "total_tokens": mock_total_tokens,
+                    "input_tokens": mock_input_tokens,
+                    "output_tokens": mock_output_tokens,
+                    "calls": api_calls,
+                    "cost": round(api_calls * 0.001, 3),
+                }
+            },
+        },
+    )
+    trajectory_log = [
+        {
+            "seq": 1,
+            "phase": "mock",
+            "actor": "mock_engine",
+            "action": "simulate_evolution",
+            "input_summary": f"total={total}, gens={gens}",
+            "output_summary": f"api_calls={api_calls}, tokens={mock_total_tokens}",
+            "metrics": {"reasoning_effort": reasoning_effort},
+        },
+        {
+            "seq": 2,
+            "phase": "answer_graph",
+            "actor": "graph_builder",
+            "action": "build_answer_graph",
+            "input_summary": "mock result",
+            "output_summary": f"nodes={answer_graph['summary']['node_count']}",
+            "metrics": answer_graph["summary"],
+        },
+    ]
+    trajectory_summary = {
+        "event_count": len(trajectory_log),
+        "phases": {"mock": 1, "answer_graph": 1},
+        "actors": {"mock_engine": 1, "graph_builder": 1},
+    }
+    trajectory_replay = build_trajectory_replay(trajectory_log)
+
     await emit("run_complete", "complete",
                 total_api_calls=api_calls, estimated_cost=round(api_calls * 0.001, 3),
                 duration=round(time.time() % 1000, 1))
@@ -944,22 +1171,26 @@ async def run_mock_evolution(ws: WebSocket, config: dict):
         "champion": champion.to_dict(),
         "total_api_calls": api_calls,
         "estimated_cost": round(api_calls * 0.001, 3),
+        "resource_report": resource_report,
+        "token_budget_plan": token_budget_plan,
+        "token_budget_report": token_budget_report,
+        "token_budget_events": [],
+        "trajectory_log": trajectory_log,
+        "trajectory_summary": trajectory_summary,
+        "trajectory_replay": trajectory_replay,
         "event_count": len(all_events),
         "generations_data": generations_data,
         "top5": [a.to_dict() for a in agents[:5]],
-        "evolved_answer": (
-            f"Final EvoHive mock answer for: {config.get('problem', 'Mock evolution test')}\n\n"
-            "1. Define a narrow target segment and position the offer around a measurable outcome.\n"
-            "2. Start with a low-friction entry tier to maximize adoption and feedback volume.\n"
-            "3. Reserve premium pricing for automation depth, team workflows, and advanced reliability.\n"
-            "4. Use battle-tested proof points, benchmarks, and before/after comparisons in the final pitch.\n"
-            "5. Keep iterating based on real user objections, not just internal assumptions."
-        ),
+        "evolved_answer": evolved_answer,
+        "lineage_graph": lineage_graph,
+        "verification_report": verification_report,
+        "claim_verification_report": claim_verification_report,
+        "answer_graph": answer_graph,
     }
-    artifact = _persist_run_artifact(
+    artifact = await _persist_run_artifact_async(
         run_id=f"mock-{uuid.uuid4().hex[:8]}",
         mode="mock",
-        config=config,
+        config=safe_config,
         results=results_payload,
         events=all_events,
     )
@@ -983,6 +1214,10 @@ def _has_real_keys() -> bool:
     return any(os.environ.get(k) for k in key_vars)
 
 
+def _has_real_keys_for_config(config: dict | None) -> bool:
+    return _has_real_keys() or bool(_normalize_api_keys((config or {}).get("api_keys")))
+
+
 # ── WebSocket endpoint ──
 
 @app.websocket("/ws")
@@ -991,43 +1226,47 @@ async def websocket_endpoint(ws: WebSocket):
     try:
         while True:
             data = await ws.receive_text()
-            print(f"[WS] Received raw: {data[:200]}", flush=True)
-            msg = json.loads(data)
-            print(f"[WS] Parsed type: {msg.get('type')}", flush=True)
+            try:
+                msg = json.loads(data)
+            except json.JSONDecodeError:
+                await ws.send_json(_make_ws_error_payload(ClientMessageError("Malformed JSON message.")))
+                continue
+            if not isinstance(msg, dict):
+                await ws.send_json(_make_ws_error_payload(ClientMessageError("WebSocket message must be a JSON object.")))
+                continue
+            logger.info("WebSocket message received type=%s bytes=%s", msg.get("type"), len(data))
 
             if msg.get("type") == "start_war":
                 config = msg.get("config", {})
+                if config is None:
+                    config = {}
+                if not isinstance(config, dict):
+                    await ws.send_json(_make_ws_error_payload(ClientMessageError("start_war config must be an object.")))
+                    continue
                 try:
-                    real_mode = _has_real_keys()
+                    real_mode = _has_real_keys_for_config(config)
                     if real_mode:
-                        print(f"[REAL MODE] Starting evolution with config: {config}", flush=True)
+                        logger.info("Starting real evolution with config=%s", _redact_config(config))
                         await run_real_evolution(ws, config)
                     else:
-                        print(f"[MOCK MODE] Starting evolution with config: {config}")
+                        logger.info("Starting mock evolution with config=%s", _redact_config(config))
                         await run_mock_evolution(ws, config)
                 except Exception as e:
-                    tb = traceback.format_exc()
-                    err = _normalize_runtime_error(e)
-                    print(f"Evolution error: {tb}")
-                    await ws.send_json({
-                        "type": "war_error",
-                        "error": err["error"],
-                        "error_code": err["error_code"],
-                        "retryable": err["retryable"],
-                        "traceback": tb,
-                    })
+                    payload = _make_ws_error_payload(e, config)
+                    logger.exception("Evolution error [%s]", payload["error_id"])
+                    await ws.send_json(payload)
 
             elif msg.get("type") == "ping":
                 await ws.send_json({"type": "pong"})
 
     except WebSocketDisconnect:
         pass
-    except Exception as e:
-        print(f"WebSocket error: {e}")
+    except Exception:
+        logger.exception("WebSocket error")
 
 
 if __name__ == "__main__":
     mode_str = "REAL" if _has_real_keys() else "MOCK"
-    print(f"Starting EvoHive War Server on http://0.0.0.0:8080 [{mode_str} MODE]")
-    print(f"Frontend: {FRONTEND_PATH}")
+    print(f"Starting EvoHive Backend Server on http://0.0.0.0:8080 [{mode_str} MODE]")
+    print("API root: http://0.0.0.0:8080/")
     uvicorn.run(app, host="0.0.0.0", port=8080, log_level="info")

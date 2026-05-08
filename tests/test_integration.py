@@ -278,6 +278,36 @@ async def test_evolution_fast_mode_e2e():
 
     # Cost tracking populated
     assert result.total_api_calls > 0, "Should track API calls"
+    assert result.estimated_cost > 0, "Should track real usage cost from mocked LLM responses"
+    assert result.cost_breakdown["total_calls"] > 0
+    assert result.cost_breakdown["total_input_tokens"] > 0
+    assert result.cost_breakdown["total_output_tokens"] > 0
+    assert result.total_api_calls == result.cost_breakdown["total_calls"]
+    assert result.resource_report["version"] == "resource-report.v1"
+    assert result.resource_report["total_tokens"] > 0
+    assert result.resource_report["generations"]
+    assert result.token_budget_plan["version"] == "token-budget-plan.v1"
+    assert result.token_budget_report["version"] == "token-budget-report.v1"
+    assert result.reasoning_effort == "quick"
+    assert result.trajectory_summary["event_count"] > 0
+    assert any(entry["action"] == "build_answer_graph" for entry in result.trajectory_log)
+    assert result.trajectory_replay["version"] == "trajectory-replay.v1"
+
+    # Lineage graph populated
+    assert result.lineage_graph["summary"]["node_count"] > 0
+    assert "nodes" in result.lineage_graph
+    assert "edges" in result.lineage_graph
+
+    # Verification report populated
+    assert result.verification_report["summary"]["claim_count"] > 0
+    assert "claims" in result.verification_report
+    assert result.claim_verification_report["version"] == "claim-verification-loop.v1"
+
+    # Answer graph populated for frontend rendering
+    assert result.answer_graph["version"] == "answer-graph.v1"
+    assert result.answer_graph["summary"]["node_count"] > 0
+    assert any(node["type"] == "answer_quantum" for node in result.answer_graph["nodes"])
+    assert any(node["type"] == "claim" for node in result.answer_graph["nodes"])
 
     # No swarm stats when swarm is disabled
     assert result.swarm_stats == {}, "Swarm stats should be empty when swarm disabled"
@@ -288,11 +318,9 @@ async def test_evolution_budget_exceeded():
     """Verify that an extremely low budget either triggers early stop or
     raises ``BudgetExceededError``.
 
-    Note: The current implementation creates a ``CostTracker`` but does not
-    call ``record_call`` on it during the loop (cost is tracked via
-    ``run.total_api_calls`` counter).  Therefore, the budget check inside
-    ``CostTracker`` is never triggered during the run.  We verify the run
-    completes and check that the budget_limit is recorded.
+    Token usage is now recorded through the session CostTracker. Depending
+    on mocked usage size and model pricing, a tiny budget may trip during
+    the run or the run may finish before crossing the threshold.
     """
     config = _fast_config(population_size=4, generations=1)
 
@@ -315,6 +343,25 @@ async def test_evolution_budget_exceeded():
     if completed:
         assert isinstance(result, EvolutionRun)
         assert result.budget_limit == 0.0001
+
+
+@pytest.mark.asyncio
+async def test_evolution_token_budget_control_records_runtime_event():
+    """When enabled, runtime token budget control records decisions."""
+    config = _fast_config(
+        population_size=6,
+        generations=2,
+        enable_token_budget_control=True,
+        token_budget_multiplier=0.1,
+    )
+
+    p1, p2, p3 = _patch_all()
+    with p1, p2, p3:
+        result = await run_evolution(config)
+
+    assert result.token_budget_events
+    assert result.token_budget_report["runtime_events"]
+    assert result.early_stop_reason or result.token_budget_events[-1]["should_skip_optional"]
 
 
 @pytest.mark.asyncio

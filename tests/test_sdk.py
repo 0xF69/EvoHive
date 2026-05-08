@@ -51,6 +51,55 @@ def _make_run(**overrides) -> EvolutionRun:
         refined_top_solution="A deeply refined top solution with details.",
         total_api_calls=150,
         estimated_cost=0.0345,
+        cost_breakdown={
+            "total_calls": 2,
+            "providers": {"openai": {"calls": 2}},
+            "phases": {"generation": {"calls": 1}},
+        },
+        resource_report={
+            "version": "resource-report.v1",
+            "duration_sec": 1.2,
+            "total_tokens": 300,
+            "generations": [{"generation": 1, "duration_sec": 0.4}],
+        },
+        token_budget_report={
+            "version": "token-budget-report.v1",
+            "status": "within_budget",
+        },
+        token_budget_events=[
+            {"status": "soft_limit", "checkpoint": "generation_1_complete"},
+        ],
+        trajectory_log=[
+            {"seq": 1, "phase": "baseline", "actor": "tester", "action": "generate"},
+        ],
+        trajectory_summary={
+            "event_count": 1,
+            "phases": {"baseline": 1},
+            "actors": {"tester": 1},
+        },
+        trajectory_replay={
+            "version": "trajectory-replay.v1",
+            "step_count": 1,
+            "timeline": [{"phase": "baseline"}],
+        },
+        lineage_graph={
+            "summary": {"node_count": 3, "edge_count": 2, "finalist_count": 1},
+            "nodes": [],
+            "edges": [],
+        },
+        answer_graph={
+            "summary": {"node_count": 5, "edge_count": 4, "claim_node_count": 1},
+            "nodes": [],
+            "edges": [],
+        },
+        verification_report={
+            "summary": {"claim_count": 1},
+            "claims": [{"id": "claim-01", "text": "SDK claim"}],
+        },
+        claim_verification_report={
+            "version": "claim-verification-loop.v1",
+            "claim_count": 1,
+        },
     )
     defaults.update(overrides)
     return EvolutionRun(**defaults)
@@ -193,6 +242,22 @@ class TestEvolutionResultAccessors:
         run = _make_run()
         result = EvolutionResult(run)
         assert result.cost == pytest.approx(0.0345)
+
+    def test_audit_accessors(self):
+        run = _make_run()
+        result = EvolutionResult(run)
+        assert result.cost_breakdown["total_calls"] == 2
+        assert result.resource_report["total_tokens"] == 300
+        assert result.token_budget_report["status"] == "within_budget"
+        assert result.token_budget_events[0]["status"] == "soft_limit"
+        assert result.trajectory_summary["event_count"] == 1
+        assert result.trajectory_log[0]["phase"] == "baseline"
+        assert result.trajectory_replay["version"] == "trajectory-replay.v1"
+        assert result.lineage_graph["summary"]["node_count"] == 3
+        assert result.answer_graph["summary"]["node_count"] == 5
+        assert result.verification_report["summary"]["claim_count"] == 1
+        assert result.claim_verification_report["claim_count"] == 1
+        assert result.claims[0]["text"] == "SDK claim"
 
     def test_duration_seconds(self):
         run = _make_run()

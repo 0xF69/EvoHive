@@ -14,8 +14,8 @@ import json
 import logging
 import os
 import re
-import sys
 import time
+from contextvars import ContextVar
 import litellm
 
 # ═══ 彻底关闭LiteLLM的所有日志/打印输出 ═══
@@ -57,27 +57,201 @@ try:
 except Exception:
     pass
 
-# 终极补丁: 拦截builtins.print，过滤LiteLLM的直接print输出
-import builtins
-_original_print = builtins.print
-
-def _filtered_print(*args, **kwargs):
-    """拦截全局print，过滤LiteLLM的垃圾输出"""
-    text = " ".join(str(a) for a in args)
-    _litellm_keywords = [
-        "LiteLLM", "litellm", "Give Feedback", "BerriAI",
-        "Provider List:", "get_llm_provider", "completion()",
-        "\x1b[92m", "\x1b[1m",
-    ]
-    if any(kw in text for kw in _litellm_keywords):
-        return  # 静默吞掉
-    return _original_print(*args, **kwargs)
-
-builtins.print = _filtered_print
-
 # ── EvoHive structured logger (lazy init to avoid circular import) ──
 _dm_logger = None
 _log_event_fn = None
+
+_SESSION_API_KEYS: ContextVar[dict[str, str]] = ContextVar("evohive_session_api_keys", default={})
+_SESSION_COST_TRACKER: ContextVar[object | None] = ContextVar("evohive_session_cost_tracker", default=None)
+_SESSION_COST_PHASE: ContextVar[str] = ContextVar("evohive_session_cost_phase", default="llm")
+_SESSION_TOKEN_BUDGET: ContextVar[dict | None] = ContextVar("evohive_session_token_budget", default=None)
+_PROVIDER_ALIASES = {
+    "together_ai": "together",
+    "fireworks_ai": "fireworks",
+}
+
+
+def set_session_api_keys(api_keys: dict[str, str]):
+    """Attach per-run API keys to the current async context."""
+    normalized = {
+        _PROVIDER_ALIASES.get(str(provider).strip().lower(), str(provider).strip().lower()): str(secret).strip()
+        for provider, secret in (api_keys or {}).items()
+        if str(provider).strip() and str(secret).strip()
+    }
+    return _SESSION_API_KEYS.set(normalized)
+
+
+def reset_session_api_keys(token) -> None:
+    _SESSION_API_KEYS.reset(token)
+
+
+def _session_api_key_for_provider(provider: str) -> str:
+    normalized = _PROVIDER_ALIASES.get((provider or "").strip().lower(), (provider or "").strip().lower())
+    return _SESSION_API_KEYS.get().get(normalized, "")
+
+
+def set_session_cost_tracker(cost_tracker, phase: str = "llm"):
+    """Attach a CostTracker to the current async context."""
+    tracker_token = _SESSION_COST_TRACKER.set(cost_tracker)
+    phase_token = _SESSION_COST_PHASE.set(phase or "llm")
+    return tracker_token, phase_token
+
+
+def set_session_cost_phase(phase: str) -> None:
+    """Tag subsequent LLM calls in this async context with a cost phase."""
+    _SESSION_COST_PHASE.set(phase or "llm")
+
+
+def reset_session_cost_tracker(tokens) -> None:
+    tracker_token, phase_token = tokens
+    _SESSION_COST_PHASE.reset(phase_token)
+    _SESSION_COST_TRACKER.reset(tracker_token)
+
+
+def clear_session_cost_tracker() -> None:
+    """Clear cost tracking from the current async context."""
+    _SESSION_COST_PHASE.set("llm")
+    _SESSION_COST_TRACKER.set(None)
+
+
+def set_session_token_budget(plan: dict, *, enabled: bool = True, min_output_tokens: int = 1):
+    """Attach a token budget plan to the current async context.
+
+    The provider uses this as a last-mile guard: it clips per-call max_tokens
+    using the current cost phase and the tokens already recorded by CostTracker.
+    """
+    state = {
+        "plan": plan or {},
+        "enabled": bool(enabled),
+        "min_output_tokens": max(1, int(min_output_tokens)),
+        "events": [],
+    }
+    return _SESSION_TOKEN_BUDGET.set(state)
+
+
+def reset_session_token_budget(token) -> None:
+    _SESSION_TOKEN_BUDGET.reset(token)
+
+
+def clear_session_token_budget() -> None:
+    _SESSION_TOKEN_BUDGET.set(None)
+
+
+def get_session_token_budget_events() -> list[dict]:
+    state = _SESSION_TOKEN_BUDGET.get()
+    if not state:
+        return []
+    return list(state.get("events", []))
+
+
+def _usage_value(usage, *names: str) -> int:
+    for name in names:
+        if isinstance(usage, dict):
+            value = usage.get(name)
+        else:
+            value = getattr(usage, name, None)
+        if value is not None:
+            try:
+                return int(value)
+            except (TypeError, ValueError):
+                return 0
+    return 0
+
+
+def _record_session_cost(model: str, response) -> None:
+    tracker = _SESSION_COST_TRACKER.get()
+    if tracker is None:
+        return
+    usage = getattr(response, "usage", None)
+    if usage is None and isinstance(response, dict):
+        usage = response.get("usage")
+    if usage is None:
+        return
+    input_tokens = _usage_value(usage, "prompt_tokens", "input_tokens")
+    output_tokens = _usage_value(usage, "completion_tokens", "output_tokens")
+    if input_tokens <= 0 and output_tokens <= 0:
+        total_tokens = _usage_value(usage, "total_tokens")
+        input_tokens = total_tokens
+    tracker.record_call(model, input_tokens, output_tokens, phase=_SESSION_COST_PHASE.get())
+
+
+def _estimate_prompt_tokens(messages: list[dict]) -> int:
+    """Cheap token estimate for pre-call budget clipping.
+
+    We intentionally avoid provider-specific tokenizers here; this runs before
+    every LLM call, so a conservative chars/4 estimate is good enough to keep
+    runaway outputs from blowing up a phase budget.
+    """
+    total_chars = 0
+    for message in messages:
+        total_chars += len(str(message.get("role", ""))) + len(str(message.get("content", ""))) + 4
+    return max(1, total_chars // 4)
+
+
+def _apply_session_token_budget(max_tokens: int, messages: list[dict]) -> int:
+    state = _SESSION_TOKEN_BUDGET.get()
+    tracker = _SESSION_COST_TRACKER.get()
+    if not state or not state.get("enabled") or tracker is None:
+        return max_tokens
+
+    plan = state.get("plan") or {}
+    total_budget = int(plan.get("total_token_budget") or 0)
+    if total_budget <= 0:
+        return max_tokens
+
+    phase = _SESSION_COST_PHASE.get()
+    phase_budgets = plan.get("phase_budgets") or {}
+    phase_budget = int(phase_budgets.get(phase) or 0)
+    policy = plan.get("policy") or {}
+    hard_stop_at = float(policy.get("hard_stop_at", 1.15))
+
+    snapshot = tracker.snapshot()
+    total_used = int(snapshot.get("total_input_tokens", 0)) + int(snapshot.get("total_output_tokens", 0))
+    total_limit = max(1, int(total_budget * hard_stop_at))
+    total_room = total_limit - total_used
+
+    effective_room = total_room
+    phase_room = None
+    if phase_budget > 0:
+        phase_data = (snapshot.get("phases") or {}).get(phase, {})
+        phase_used = int(phase_data.get("input_tokens", 0)) + int(phase_data.get("output_tokens", 0))
+        phase_limit = max(1, int(phase_budget * hard_stop_at))
+        phase_room = phase_limit - phase_used
+        effective_room = min(total_room, phase_room)
+
+    prompt_estimate = _estimate_prompt_tokens(messages)
+    available_output = effective_room - prompt_estimate
+    if available_output >= max_tokens:
+        return max_tokens
+
+    capped = max(1, min(max_tokens, available_output))
+    capped = max(capped, min(int(state.get("min_output_tokens", 1)), max_tokens))
+    if capped >= max_tokens:
+        return max_tokens
+
+    event = {
+        "version": "llm-token-budget-cap.v1",
+        "phase": phase,
+        "requested_max_tokens": max_tokens,
+        "capped_max_tokens": capped,
+        "estimated_prompt_tokens": prompt_estimate,
+        "total_budget_tokens": total_budget,
+        "total_tokens_used_before_call": total_used,
+        "total_room_tokens": total_room,
+        "phase_budget_tokens": phase_budget,
+        "phase_room_tokens": phase_room,
+        "reason": "prompt_exceeds_remaining" if available_output <= 0 else "output_capped",
+    }
+    state.setdefault("events", []).append(event)
+    log_event(
+        _get_dm_logger(),
+        "llm_token_budget_cap",
+        phase=phase,
+        requested=max_tokens,
+        capped=capped,
+        reason=event["reason"],
+    )
+    return capped
 
 def _get_dm_logger():
     global _dm_logger, _log_event_fn
@@ -312,15 +486,18 @@ def _resolve_model(model: str) -> dict:
 
     # 检查是否命中自定义Provider
     prefix = model.split("/")[0] if "/" in model else ""
+    session_api_key = _session_api_key_for_provider(prefix)
     if prefix in CUSTOM_PROVIDERS:
         cfg = CUSTOM_PROVIDERS[prefix]
         # 去掉自定义前缀，换成litellm识别的前缀
         actual_model_name = model[len(prefix) + 1:]  # e.g. "Qwen/Qwen2.5-7B-Instruct"
         resolved_model = f"{cfg['litellm_prefix']}/{actual_model_name}"
         extra_kwargs["api_base"] = cfg["api_base"]
-        api_key = os.environ.get(cfg["env_var"], "")
+        api_key = session_api_key or os.environ.get(cfg["env_var"], "")
         if api_key:
             extra_kwargs["api_key"] = api_key
+    elif session_api_key:
+        extra_kwargs["api_key"] = session_api_key
 
     return {"model": resolved_model, **extra_kwargs}
 
@@ -363,6 +540,7 @@ async def call_llm(
     except RuntimeError as e:
         # Try fallback models if primary fails
         primary_error = e
+        fallback_errors: list[str] = []
         provider = _extract_provider(model)
         for fallback in _fallback_models:
             if fallback == model:
@@ -384,9 +562,16 @@ async def call_llm(
                     temperature, max_tokens, json_mode,
                     None, None, 1,  # fewer retries for fallback
                 )
-            except Exception:
+            except Exception as fallback_error:
+                fallback_errors.append(f"{fallback}: {fallback_error}")
+                log_event(_get_dm_logger(), "fallback_failed",
+                          original=model, fallback=fallback,
+                          error=str(fallback_error)[:200])
                 continue
         # All fallbacks failed too
+        if fallback_errors:
+            joined = " | ".join(fallback_errors[:3])
+            raise RuntimeError(f"{primary_error}; fallback failures: {joined}") from primary_error
         raise primary_error
 
 
@@ -406,6 +591,19 @@ async def _call_llm_single(
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": user_prompt},
     ]
+    requested_max_tokens = max_tokens
+    max_tokens = _apply_session_token_budget(max_tokens, messages)
+    if max_tokens < requested_max_tokens:
+        budget_note = (
+            "\n\nToken budget notice: produce a concise but complete response "
+            f"within {max_tokens} output tokens. Prefer a short finished answer "
+            "over a long answer that stops mid-sentence."
+        )
+        if json_mode:
+            budget_note += " Return compact valid JSON only."
+        else:
+            budget_note += " Use short bullets or short paragraphs, and end with a complete final sentence."
+        messages[0]["content"] = f"{messages[0]['content']}{budget_note}"
 
     # 自动解析Provider配置
     resolved = _resolve_model(model)
@@ -443,8 +641,11 @@ async def _call_llm_single(
             async with limiter.semaphore:
                 response = await litellm.acompletion(**kwargs)
             await cb.record_success()
+            _record_session_cost(model, response)
             return response.choices[0].message.content
         except Exception as e:
+            if e.__class__.__name__ == "BudgetExceededError":
+                raise
             last_error = e
             error_type = _classify_error(e)
 

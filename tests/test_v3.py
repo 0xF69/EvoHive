@@ -229,6 +229,71 @@ def test_evolution_config_deep_mode():
     assert cfg.mode == "deep"
 
 
+from evohive.engine.effort import (
+    apply_reasoning_effort,
+    normalize_reasoning_effort,
+    normalize_token_budget_control,
+)
+
+
+def test_reasoning_effort_presets_adjust_config():
+    quick = apply_reasoning_effort(EvolutionConfig(
+        problem="test",
+        reasoning_effort="quick",
+        population_size=50,
+        generations=10,
+    ))
+    assert quick.mode == "fast"
+    assert quick.population_size == 8
+    assert quick.generations == 1
+    assert quick.enable_red_team is False
+
+    max_effort = apply_reasoning_effort(EvolutionConfig(
+        problem="test",
+        reasoning_effort="max",
+        population_size=5,
+        generations=1,
+    ))
+    assert max_effort.mode == "deep"
+    assert max_effort.population_size == 20
+    assert max_effort.generations == 3
+    assert max_effort.enable_debate is True
+
+
+def test_reasoning_effort_mode_backwards_compatibility():
+    assert normalize_reasoning_effort(None, "fast") == "quick"
+    assert normalize_reasoning_effort(None, "deep") == "max"
+    assert normalize_reasoning_effort("balanced", "fast") == "balanced"
+
+
+def test_token_budget_control_presets_are_user_switchable():
+    off = apply_reasoning_effort(EvolutionConfig(
+        problem="test",
+        reasoning_effort="quick",
+        token_budget_control="off",
+    ))
+    assert off.enable_token_budget_control is False
+
+    strict = apply_reasoning_effort(EvolutionConfig(
+        problem="test",
+        reasoning_effort="quick",
+        token_budget_control="strict",
+    ))
+    assert strict.enable_token_budget_control is True
+    assert strict.token_budget_control == "strict"
+    assert strict.token_budget_multiplier < 0.45
+
+    custom = apply_reasoning_effort(EvolutionConfig(
+        problem="test",
+        reasoning_effort="quick",
+        token_budget_control="auto",
+        token_budget_multiplier=2.0,
+    ))
+    assert custom.enable_token_budget_control is True
+    assert custom.token_budget_multiplier == 2.0
+    assert normalize_token_budget_control("cheap") == "strict"
+
+
 # ═══ Web Search Tests ═══
 
 from evohive.engine.web_search import web_search
@@ -255,6 +320,26 @@ async def test_web_search_no_api_key():
 
 from evohive.engine.cost_tracker import (
     CostTracker, BudgetExceededError, estimate_run_cost,
+)
+from evohive.engine.answer_graph import build_answer_graph
+from evohive.engine.claim_verifier import (
+    build_claim_search_verification_report,
+    build_claim_verification_report,
+)
+from evohive.engine.verification import build_verification_report
+from evohive.engine.token_budget import (
+    assess_live_token_budget,
+    build_token_budget_plan,
+    build_token_budget_report,
+)
+from evohive.engine.trajectory_replay import build_trajectory_replay
+from evohive.llm.provider import (
+    call_llm,
+    clear_session_cost_tracker,
+    clear_session_token_budget,
+    reset_session_cost_tracker,
+    set_session_cost_tracker,
+    set_session_token_budget,
 )
 
 
@@ -303,6 +388,98 @@ def test_cost_tracker_format_report():
     assert "swarm" in report
 
 
+def test_cost_tracker_snapshot_breakdown():
+    tracker = CostTracker()
+    tracker.record_call("openai/gpt-4o", 1000, 500, phase="generation")
+    tracker.record_call("openai/gpt-4o", 120, 80, phase="judge")
+
+    snapshot = tracker.snapshot()
+
+    assert snapshot["total_calls"] == 2
+    assert snapshot["providers"]["openai"]["calls"] == 2
+    assert snapshot["providers"]["openai"]["input_tokens"] == 1120
+    assert snapshot["phases"]["generation"]["output_tokens"] == 500
+    assert snapshot["phases"]["judge"]["calls"] == 1
+
+
+@pytest.mark.asyncio
+async def test_llm_call_records_session_cost_tracker():
+    tracker = CostTracker()
+    mock_resp = MagicMock()
+    mock_resp.choices = [MagicMock()]
+    mock_resp.choices[0].message.content = "tracked response"
+    mock_resp.usage.prompt_tokens = 123
+    mock_resp.usage.completion_tokens = 45
+
+    tokens = set_session_cost_tracker(tracker, phase="unit")
+    try:
+        with patch("evohive.llm.provider.litellm.acompletion", new_callable=AsyncMock, return_value=mock_resp):
+            result = await call_llm("openai/gpt-4o", "system", "user", max_retries=0)
+    finally:
+        reset_session_cost_tracker(tokens)
+
+    assert result == "tracked response"
+    assert tracker.call_count == 1
+    assert tracker.total_input_tokens == 123
+    assert tracker.total_output_tokens == 45
+    assert tracker.total_cost > 0
+
+
+@pytest.mark.asyncio
+async def test_llm_call_clips_max_tokens_against_session_token_budget():
+    tracker = CostTracker()
+    mock_resp = MagicMock()
+    mock_resp.choices = [MagicMock()]
+    mock_resp.choices[0].message.content = "budgeted response"
+    mock_resp.usage.prompt_tokens = 20
+    mock_resp.usage.completion_tokens = 12
+
+    cost_tokens = set_session_cost_tracker(tracker, phase="budgeted")
+    budget_token = set_session_token_budget(
+        {
+            "total_token_budget": 200,
+            "phase_budgets": {"budgeted": 80},
+            "policy": {"hard_stop_at": 1.0},
+        },
+        enabled=True,
+    )
+    try:
+        with patch("evohive.llm.provider.litellm.acompletion", new_callable=AsyncMock, return_value=mock_resp) as mocked:
+            result = await call_llm(
+                "openai/gpt-4o",
+                "system",
+                "user prompt",
+                max_tokens=500,
+                max_retries=0,
+            )
+    finally:
+        reset_session_cost_tracker(cost_tokens)
+        clear_session_token_budget()
+
+    assert result == "budgeted response"
+    assert mocked.call_args.kwargs["max_tokens"] < 500
+    assert mocked.call_args.kwargs["max_tokens"] >= 1
+
+
+@pytest.mark.asyncio
+async def test_clear_session_cost_tracker_stops_recording():
+    tracker = CostTracker()
+    set_session_cost_tracker(tracker, phase="unit")
+    clear_session_cost_tracker()
+
+    mock_resp = MagicMock()
+    mock_resp.choices = [MagicMock()]
+    mock_resp.choices[0].message.content = "untracked response"
+    mock_resp.usage.prompt_tokens = 100
+    mock_resp.usage.completion_tokens = 50
+
+    with patch("evohive.llm.provider.litellm.acompletion", new_callable=AsyncMock, return_value=mock_resp):
+        result = await call_llm("openai/gpt-4o", "system", "user", max_retries=0)
+
+    assert result == "untracked response"
+    assert tracker.call_count == 0
+
+
 def test_cost_tracker_reset():
     tracker = CostTracker()
     tracker.record_call("openai/gpt-4o", 1000, 500, phase="test")
@@ -320,6 +497,169 @@ def test_estimate_run_cost():
     assert "breakdown" in result
     assert result["estimated_min"] <= result["estimated_max"]
     assert result["estimated_min"] >= 0
+
+
+def test_token_budget_report_flags_over_budget_phase():
+    plan = {
+        "total_token_budget": 1000,
+        "phase_budgets": {"elo_tournament": 100, "crossover": 500},
+    }
+    report = build_token_budget_report(
+        plan=plan,
+        resource_report={
+            "total_tokens": 1200,
+            "phases": {
+                "elo_tournament": {"total_tokens": 140},
+                "crossover": {"total_tokens": 200},
+            },
+        },
+    )
+
+    assert report["status"] == "over_budget"
+    assert "elo_tournament" in report["over_budget_phases"]
+    assert report["phase_reports"]["crossover"]["recommended_action"] == "ok"
+
+
+def test_live_token_budget_assessment_requests_stop():
+    assessment = assess_live_token_budget(
+        plan={
+            "total_token_budget": 1000,
+            "phase_budgets": {"evaluation": 300},
+            "policy": {"recommend_stop_at": 0.9, "hard_stop_at": 1.15},
+        },
+        cost_snapshot={
+            "total_input_tokens": 900,
+            "total_output_tokens": 300,
+            "phases": {
+                "evaluation": {"input_tokens": 500, "output_tokens": 100},
+            },
+        },
+        checkpoint="generation_1_complete",
+    )
+
+    assert assessment["status"] == "hard_stop"
+    assert assessment["should_stop"] is True
+    assert "evaluation" in assessment["over_hard_phases"]
+
+
+def test_token_budget_plan_respects_disabled_phases():
+    cfg = EvolutionConfig(
+        problem="test",
+        reasoning_effort="quick",
+        mode="fast",
+        enable_swarm=False,
+        enable_debate=False,
+        enable_pressure_test=False,
+    )
+    plan = build_token_budget_plan(cfg)
+    assert plan["total_token_budget"] > 0
+    assert "swarm" not in plan["phase_budgets"]
+    assert "debate" not in plan["phase_budgets"]
+
+
+def test_verification_report_extracts_claims_and_risks():
+    report = build_verification_report(
+        problem="Launch plan",
+        final_answer=(
+            "1. We should test a narrow ICP before scaling.\n"
+            "2. This will guarantee 100% conversion lift in 30 days."
+        ),
+        lineage_graph={"summary": {"node_count": 6, "finalist_count": 2}},
+    )
+
+    assert report["summary"]["claim_count"] == 2
+    assert report["summary"]["high_risk_claim_count"] == 1
+    assert report["claims"][0]["kind"] == "recommendation"
+    assert "absolute_language" in report["claims"][1]["risk_flags"]
+    assert "numeric_claim" in report["claims"][1]["risk_flags"]
+
+
+def test_claim_verification_loop_uses_search_context_evidence():
+    verification = build_verification_report(
+        problem="Launch plan",
+        final_answer="We should test one target user segment before scaling.",
+        lineage_graph={"summary": {"node_count": 3, "finalist_count": 1}},
+    )
+    report = build_claim_verification_report(
+        verification_report=verification,
+        search_context="Target user segment testing before scaling reduces launch risk.",
+    )
+
+    assert report["version"] == "claim-verification-loop.v1"
+    assert report["claim_count"] == 1
+    assert report["claims"][0]["evidence"]
+    assert report["summary"]["average_support_score"] > 0
+
+
+@pytest.mark.asyncio
+async def test_claim_search_verification_adds_active_search_evidence(monkeypatch):
+    verification = build_verification_report(
+        problem="Launch plan",
+        final_answer="This will guarantee 100% conversion lift in 30 days.",
+        lineage_graph={"summary": {"node_count": 3, "finalist_count": 1}},
+    )
+    base = build_claim_verification_report(verification_report=verification)
+
+    async def fake_search(query, max_results=3):
+        return [
+            {
+                "title": "Conversion lift test",
+                "snippet": "Conversion lift in 30 days should be validated with experiments.",
+                "url": "https://example.com/conversion",
+            }
+        ]
+
+    monkeypatch.setattr("evohive.engine.web_search.web_search", fake_search)
+
+    report = await build_claim_search_verification_report(
+        verification_report=verification,
+        base_report=base,
+    )
+
+    assert report["version"] == "claim-search-verification.v1"
+    assert report["searched_claim_count"] == 1
+    assert report["claims"][0]["evidence"][0]["type"] == "active_search"
+
+
+def test_trajectory_replay_builds_timeline():
+    replay = build_trajectory_replay([
+        {"seq": 2, "phase": "evaluation", "actor": "judge", "action": "score", "elapsed_sec": 2.0},
+        {"seq": 1, "phase": "baseline", "actor": "model", "action": "draft", "elapsed_sec": 1.0},
+    ])
+
+    assert replay["version"] == "trajectory-replay.v1"
+    assert replay["step_count"] == 2
+    assert replay["timeline"][0]["phase"] == "baseline"
+
+
+def test_answer_graph_combines_lineage_claims_and_verifiers():
+    verification = build_verification_report(
+        problem="Launch plan",
+        final_answer="We should test a narrow ICP. This will guarantee 100% lift in 30 days.",
+        lineage_graph={"summary": {"node_count": 2, "finalist_count": 1}},
+    )
+    graph = build_answer_graph(
+        problem="Launch plan",
+        final_answer="We should test a narrow ICP. This will guarantee 100% lift in 30 days.",
+        lineage_graph={
+            "nodes": [
+                {"id": "s1", "label": "seed", "generation": 0, "fitness": 0.4, "state": "active"},
+                {"id": "s2", "label": "winner", "generation": 1, "fitness": 0.9, "state": "finalist"},
+            ],
+            "edges": [{"source": "s1", "target": "s2", "type": "parent_a", "generation": 1}],
+            "summary": {"node_count": 2, "edge_count": 1, "finalist_count": 1},
+        },
+        verification_report=verification,
+        top_solutions=[{"id": "s2", "content": "Winner content", "fitness": 0.9}],
+    )
+
+    assert graph["version"] == "answer-graph.v1"
+    assert graph["summary"]["solution_node_count"] == 2
+    assert graph["summary"]["claim_node_count"] == 2
+    assert any(node["id"] == "problem" for node in graph["nodes"])
+    assert any(node["type"] == "answer_quantum" for node in graph["nodes"])
+    assert any(edge["type"] == "collapses_to" for edge in graph["edges"])
+    assert any(edge["type"] == "contains_claim" for edge in graph["edges"])
 
 
 # ═══ Persistence Tests ═══
@@ -341,7 +681,93 @@ def _make_test_run() -> EvolutionRun:
         baseline_solution="This is the baseline.",
         total_api_calls=42,
         estimated_cost=1.23,
+        cost_breakdown={
+            "total_calls": 2,
+            "total_input_tokens": 1120,
+            "total_output_tokens": 580,
+            "providers": {
+                "openai": {
+                    "calls": 2,
+                    "input_tokens": 1120,
+                    "output_tokens": 580,
+                    "cost": 0.01,
+                }
+            },
+            "phases": {
+                "generation": {
+                    "calls": 1,
+                    "input_tokens": 1000,
+                    "output_tokens": 500,
+                    "cost": 0.008,
+                }
+            },
+        },
+        resource_report={
+            "version": "resource-report.v1",
+            "duration_sec": 1.5,
+            "total_tokens": 1700,
+            "tokens_per_sec": 1133.33,
+            "generations": [{"generation": 1, "duration_sec": 0.7}],
+        },
+        token_budget_report={
+            "version": "token-budget-report.v1",
+            "status": "within_budget",
+            "usage_ratio": 0.4,
+        },
+        trajectory_log=[
+            {"seq": 1, "phase": "baseline", "actor": "tester", "action": "generate"},
+        ],
+        trajectory_summary={
+            "event_count": 1,
+            "phases": {"baseline": 1},
+            "actors": {"tester": 1},
+        },
         refined_top_solution="This is the refined solution.",
+        lineage_graph={
+            "summary": {
+                "node_count": 3,
+                "edge_count": 2,
+                "finalist_count": 1,
+                "mutated_count": 1,
+                "eliminated_count": 1,
+            },
+            "nodes": [],
+            "edges": [],
+        },
+        answer_graph={
+            "summary": {
+                "node_count": 5,
+                "edge_count": 4,
+                "solution_node_count": 2,
+                "claim_node_count": 1,
+                "verifier_node_count": 2,
+            },
+            "nodes": [],
+            "edges": [],
+        },
+        verification_report={
+            "summary": {
+                "claim_count": 1,
+                "high_risk_claim_count": 0,
+                "average_confidence": 0.7,
+            },
+            "claims": [
+                {
+                    "id": "claim-01",
+                    "kind": "factual",
+                    "confidence": 0.7,
+                    "text": "This is a persisted verification claim.",
+                    "risk_flags": [],
+                }
+            ],
+        },
+        claim_verification_report={
+            "version": "claim-verification-loop.v1",
+            "claim_count": 1,
+            "evidence_source": "search_context",
+            "summary": {"needs_external_verifier": 0, "average_support_score": 0.7},
+            "claims": [],
+        },
         mode="fast",
         generations_data=[
             GenerationStats(
@@ -363,6 +789,14 @@ def test_format_markdown_report():
     assert "Baseline" in md
     assert "Top 1 Solution" in md
     assert "0.85" in md
+    assert "Verification Report" in md
+    assert "Lineage Graph" in md
+    assert "Answer Graph" in md
+    assert "Cost By Provider" in md
+    assert "Runtime Seconds" in md
+    assert "Trajectory Summary" in md
+    assert "Claim Verification Loop" in md
+    assert "This is a persisted verification claim." in md
 
 
 def test_save_and_load_run():
@@ -936,5 +1370,3 @@ def test_list_checkpoints():
         for c in checkpoints:
             assert c["timestamp"] is not None
             assert c["filename"].endswith(".ckpt.json")
-
-

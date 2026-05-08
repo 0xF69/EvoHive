@@ -46,6 +46,11 @@ class EvolutionConfig(BaseModel):
     memory_window: int = 2  # 淘汰记忆保留的代数
     # v3.0 Swarm & mode
     mode: str = "deep"  # "fast" or "deep"
+    reasoning_effort: str = ""  # "quick", "balanced", or "max"; empty follows mode
+    token_budget_control: str = "off"  # "off", "auto", "relaxed", or "strict"
+    token_budget_multiplier: float = 1.0  # Derived from reasoning_effort
+    enable_token_budget_control: bool = False  # Enforce token budget during the run
+    enable_claim_search_verification: bool = False  # Actively search evidence for weak claims
     enable_swarm: bool = True  # Enable swarm layer
     swarm_count: int = 500  # Number of swarm seeds
     swarm_max_representatives: int = 50  # Max cluster representatives
@@ -75,6 +80,10 @@ class EvolutionRun(BaseModel):
     total_api_calls: int = 0
     estimated_cost: float = 0.0
     cost_breakdown: dict = {}  # 按阶段拆分的成本明细
+    resource_report: dict = {}  # Runtime, token, and efficiency metrics
+    token_budget_plan: dict = {}  # Planned token budget by phase
+    token_budget_report: dict = {}  # Actual token usage against the plan
+    token_budget_events: list[dict] = []  # Runtime budget control decisions
     budget_limit: Optional[float] = None  # 预算上限 (USD)
     refined_top_solution: str = ""
     early_stop_reason: Optional[str] = None
@@ -86,9 +95,18 @@ class EvolutionRun(BaseModel):
     # v3.0 Swarm & mode
     swarm_stats: dict = {}  # Swarm phase statistics
     event_log: list[dict] = []  # Event log for replay
+    trajectory_log: list[dict] = []  # Agent/action trajectory for audit and replay
+    trajectory_summary: dict = {}  # Compact counts by phase and actor
+    trajectory_replay: dict = {}  # Frontend-friendly replay timeline
     mode: str = "deep"  # Which mode was used
+    reasoning_effort: str = "balanced"  # Effort preset used
+    effort_profile: dict = {}  # Applied reasoning effort metadata
     search_context: str = ""  # Search context used
     quality_comparison: dict = {}  # Baseline vs Top1 自动对比结果
     # v3.1 Adaptive parameter history
     adaptive_history: list[dict] = []  # History of adaptive parameter adjustments
     execution_results: list[dict] = []     # Execution verification results per generation
+    lineage_graph: dict = {}  # Solution ancestry graph for replay and audit
+    verification_report: dict = {}  # Claim-level verification scaffold for the final answer
+    claim_verification_report: dict = {}  # Claim verification loop results
+    answer_graph: dict = {}  # Render-ready graph combining lineage, final answer, and claims

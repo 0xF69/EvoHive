@@ -66,6 +66,66 @@ class EvolutionResult:
         return self._run.estimated_cost
 
     @property
+    def cost_breakdown(self) -> dict:
+        """Tracked LLM usage and cost grouped by provider and phase."""
+        return self._run.cost_breakdown
+
+    @property
+    def resource_report(self) -> dict:
+        """Runtime, token, and efficiency metrics for the run."""
+        return self._run.resource_report
+
+    @property
+    def token_budget_report(self) -> dict:
+        """Actual token usage compared with the planned budget."""
+        return self._run.token_budget_report
+
+    @property
+    def token_budget_events(self) -> list[dict]:
+        """Runtime token budget control decisions."""
+        return self._run.token_budget_events
+
+    @property
+    def trajectory_log(self) -> list[dict]:
+        """Compact action trajectory for replay and audit."""
+        return self._run.trajectory_log
+
+    @property
+    def trajectory_replay(self) -> dict:
+        """Frontend-friendly replay timeline."""
+        return self._run.trajectory_replay
+
+    @property
+    def trajectory_summary(self) -> dict:
+        """Counts of trajectory events by phase and actor."""
+        return self._run.trajectory_summary
+
+    @property
+    def lineage_graph(self) -> dict:
+        """Solution ancestry graph for replay and audit."""
+        return self._run.lineage_graph
+
+    @property
+    def answer_graph(self) -> dict:
+        """Render-ready graph combining answer quanta, claims, and verifiers."""
+        return self._run.answer_graph
+
+    @property
+    def verification_report(self) -> dict:
+        """Claim-level verification scaffold for the final answer."""
+        return self._run.verification_report
+
+    @property
+    def claim_verification_report(self) -> dict:
+        """Claim verification loop results."""
+        return self._run.claim_verification_report
+
+    @property
+    def claims(self) -> list[dict]:
+        """Extracted claims from the verification report."""
+        return self._run.verification_report.get("claims", [])
+
+    @property
     def duration_seconds(self) -> float:
         """Total run time in seconds."""
         if self._run.finished_at and self._run.started_at:
@@ -111,6 +171,8 @@ async def evolve(
     population_size: int = 20,
     generations: int = 5,
     budget_limit: Optional[float] = None,
+    token_budget_control: str = "off",
+    token_budget_multiplier: float = 1.0,
     thinker_model: str = "deepseek/deepseek-chat",
     judge_model: str = "deepseek/deepseek-chat",
     save_results: bool = True,
@@ -129,6 +191,10 @@ async def evolve(
         population_size: Number of solutions per generation.
         generations: Number of evolutionary generations.
         budget_limit: Maximum budget in USD (None = unlimited).
+        token_budget_control: "off", "auto", "relaxed", or "strict".
+            Off keeps full-quality behavior; strict favors low latency/cost.
+        token_budget_multiplier: Advanced budget scale factor. Values below
+            1.0 are cheaper/tighter; values above 1.0 allow more tokens.
         thinker_model: Model for generating solutions.
         judge_model: Model for evaluating solutions.
         save_results: Whether to save results to disk.
@@ -146,11 +212,23 @@ async def evolve(
     from evohive.engine.evolution import run_evolution
 
     # Build config, letting kwargs override defaults
+    budget_control_enabled = token_budget_control.strip().lower() not in {
+        "",
+        "off",
+        "disabled",
+        "disable",
+        "false",
+        "none",
+    }
+
     config_params = dict(
         problem=problem,
         mode=mode,
         population_size=population_size,
         generations=generations,
+        token_budget_control=token_budget_control,
+        token_budget_multiplier=token_budget_multiplier,
+        enable_token_budget_control=budget_control_enabled,
         thinker_model=thinker_model,
         judge_model=judge_model,
     )
