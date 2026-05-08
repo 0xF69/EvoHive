@@ -1,87 +1,66 @@
-# EvoHive v3.0 — 进化式集体智能引擎
+# EvoHive — Evolutionary Answer Engine
 
-**让 1000 个 AI 互相厮杀，活下来的就是最好的方案。**
+EvoHive 是一个可进化、可验证、可控成本、可复盘的多模型答案引擎。
 
-将自然选择算法应用于 LLM Agent 群体。通过 Swarm 千级策略探索、多代竞争进化、交叉重组、变异、三层对抗测试，产出远超单一模型直接回答的专业方案。
+它不是让一个大模型直接给出一次回答，而是把同一个问题拆成多条候选答案路径，让多个 Thinker 生成方案，再经过评审、选择、交叉、变异、验证和预算控制，最终产出一个更可靠、可追踪的结果。
 
----
-
-## v3.0 新特性
-
-### Swarm 层 — 千级 Agent 策略探索
-- 一次生成 500-1000 个轻量策略种子（每个 50-100 token）
-- Embedding 语义聚类，自动发现 30-50 个策略方向
-- 选出代表性种子扩展为完整方案，送入进化引擎
-- 成本极低：1000 seeds ≈ $0.05-0.10
-
-### 语义 Embedding 相似度
-- 替代原始 Jaccard 词袋相似度
-- 基于 Embedding Cosine Similarity 的收敛检测、同质剔除、多样性评分
-- 失败时自动回退到 Jaccard
-
-### 瑞士轮锦标赛
-- O(N log N) 替代 O(N²) 全配对 Elo
-- 50 个 Agent 的评估从 1225 次降到 ~175 次（减少 85%）
-- 国际象棋赛制，数学上证明可靠
-
-### 事件流架构
-- 每个进化阶段发出结构化事件
-- 供 CLI、SDK、服务端日志和后端集成消费
-- 30+ 种预定义事件类型
-
-### Web Search 真实数据
-- 支持 Tavily / Serper 搜索 API
-- 方案生成和深度扩写均可注入真实市场数据
-- 未配置 API 时自动跳过，不中断流程
-
-### 快速/深度双模式
-| 模式 | Swarm | 进化 | 后进化 | 成本 | 时间 |
-|------|-------|------|--------|------|------|
-| fast | 200 seeds | 1 代 | 仅红队 | ~$0.5 | 1-2 分钟 |
-| deep | 500+ seeds | 3 代 | 红队+辩论+压力 | ~$3-5 | 8-15 分钟 |
-
-### 实时成本追踪与预算控制
-- 每次 API 调用实时记录 token 消耗和费用
-- 按 Provider / 阶段细分成本报表
-- `--budget` 设置预算上限，超出自动停止
-- 用户可切换 token 预算控制: `off` 保持完整流程，`auto` 自动省成本，`relaxed` 更偏质量，`strict` 更偏速度和低成本
-- 预运行成本估算
-
-### 检查点与崩溃恢复
-- 每代进化后原子写入检查点
-- 程序崩溃后可从最后完成的代恢复继续
-- 保留最近 2 个检查点
-
-### 断路器与自动降级
-- Per-Provider 断路器（3 次失败触发熔断，60 秒后探测恢复）
-- 主模型失败自动切换到其他 Provider 的可用模型
-- 预飞行检查 + 交互式确认不可用模型
-- 按错误类型区分重试策略（Rate Limit / Server / Timeout / Auth）
-
-### 自适应进化参数
-- 检测停滞 → 自动提升变异率
-- 检测快速改进 → 降低变异率利用当前方向
-- mutation_rate / survival_rate 动态调整
-
-### 30+ 模型支持
-- **14+ Provider**: OpenAI / Anthropic / Gemini / DeepSeek / Groq / Mistral / xAI / Together AI / Fireworks / Cohere / ZhipuAI / SiliconFlow / Moonshot / Perplexity 等
-- 自动检测环境变量中已配置的 API Key
-- 按角色需求（Thinker / Judge / Red Team / Swarm）智能分配模型
+适合处理单次 LLM 回答容易浅、容易偏、难以验证的问题，例如产品策略、代码方案、研究分析、决策推演和复杂执行计划。
 
 ---
 
-## 核心进化引擎
+## 当前核心能力
 
-- 多模型 Thinker 角色生成（persona / knowledge_bias / constraint）
-- 锦标赛选择 + 精英保留
-- 强制基因提取 + 交叉重组（禁止折中，保持锐度）
-- 5 种变异策略：假设反转 / 受众切换 / 极端放大 / 约束注入 / 类比迁移
-- 多 Judge 陪审团 + Pairwise Elo 排名
-- 淘汰反馈遗传记忆（2 代衰减窗口）
-- 反同质化猎杀 + 新鲜血液注入
-- 三层对抗：红队攻击 → 辩论淘汰赛 → 极端压力测试
-- 多章节工具增强深度扩写
-- 交互式方案对话模式
+### 答案进化引擎
+- 多 Thinker 候选方案生成
+- 锦标赛选择、精英保留、交叉重组、变异
+- 反同质化、多样性控制、新血注入
+- 支持多代进化，也支持 quick 模式快速探索
+
+### 多模型编排
+- 支持 Thinker、Judge、Red Team、Swarm 等角色分工
+- 支持 OpenAI、Anthropic、Gemini、DeepSeek、Groq、Mistral、xAI、Together、Fireworks、Cohere、Perplexity、SiliconFlow、Moonshot 等 LiteLLM 兼容 Provider
+- 支持预飞行检查、Provider 断路器、失败重试和跨 Provider fallback
+
+### 评审与排名
+- 支持自定义 Judge 维度
+- 支持多轮评分取中位数
+- 支持 Pairwise Elo 排名和 Swiss Tournament，减少全配对评审成本
+- 支持 baseline vs evolution 质量对比
+
+### 可验证输出
+- 自动从最终答案中抽取 claims
+- 生成 verification report 和 claim verification report
+- 标记高风险 claim、弱证据 claim、需要外部验证的 claim
+- 可选开启搜索验证，用 Tavily / Serper 为弱 claim 补充证据
+
+### 图结构与复盘
+- `lineage_graph`: 记录候选方案的父代、交叉、变异和淘汰路径
+- `answer_graph`: 把问题、答案量子、最终答案、claims、验证节点组织成图结构
+- `trajectory_log`: 记录每个阶段、模型角色、动作和摘要
+- `trajectory_replay`: 为 API 消费方提供可复盘的时间线数据
+
+### 成本与预算控制
+- 记录每次 LLM 调用的 input/output tokens、调用次数和估算成本
+- 生成 `cost_breakdown`、`resource_report`、`token_budget_report`
+- 支持用户切换 token 预算控制: `off`、`auto`、`relaxed`、`strict`
+- 预算紧张时可以裁剪输出、跳过昂贵阶段或提前停止
+
+### 后端服务能力
+- FastAPI HTTP API
+- WebSocket 实时事件流
+- Python SDK
+- CLI
+- 运行结果 artifact 持久化
+- checkpoint 保存与恢复
+
+---
+
+## 不属于当前版本的内容
+
+- 不是模型训练平台
+- 不是图片生成产品
+- 不是已经完成的前端可视化产品
+- 不保证答案一定正确，而是提供更强的生成、比较、验证和复盘机制
 
 ---
 
@@ -95,8 +74,8 @@
 ### 安装
 
 ```bash
-git clone https://github.com/0xF69/evohive1.0.git
-cd evohive1.0
+git clone https://github.com/0xF69/EvoHive.git
+cd EvoHive
 pip install -e .
 ```
 
