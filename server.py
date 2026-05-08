@@ -18,8 +18,7 @@ import uuid
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse
 import uvicorn
 
 from evohive.server.providers import (
@@ -54,15 +53,10 @@ from evohive.engine.verification import build_verification_report
 app = FastAPI(title="EvoHive Backend Server")
 logger = logging.getLogger("evohive.server")
 
-FRONTEND_DIR = Path(__file__).parent / "frontend"
-FRONTEND_INDEX = FRONTEND_DIR / "index.html"
 ARTIFACT_ROOT = Path(__file__).parent / "evohive_runs"
 CHECKPOINT_DIR = Path(__file__).parent / "evohive_checkpoints"
 DEFAULT_REAL_RUN_TIMEOUT_SEC = int(os.environ.get("EVOHIVE_WEB_TIMEOUT_SEC", "1800"))
 RUN_ID_RE = re.compile(r"^[A-Za-z0-9_-]{3,80}$")
-
-if FRONTEND_DIR.exists():
-    app.mount("/assets", StaticFiles(directory=FRONTEND_DIR), name="frontend_assets")
 
 
 class BudgetGuardError(Exception):
@@ -228,7 +222,7 @@ def _service_metadata() -> dict:
         "service": "EvoHive Backend",
         "status": "ok",
         "endpoints": {
-            "frontend": "/",
+            "status": "/api/status",
             "websocket": "/ws",
             "runs": "/api/runs",
             "estimate": "/api/runs/estimate",
@@ -239,9 +233,7 @@ def _service_metadata() -> dict:
 
 
 @app.api_route("/", methods=["GET", "HEAD"])
-async def frontend_index():
-    if FRONTEND_INDEX.exists():
-        return FileResponse(FRONTEND_INDEX)
+async def service_index():
     return _service_metadata()
 
 

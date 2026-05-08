@@ -14,14 +14,15 @@ async def _fast_sleep(_: float):
     return None
 
 
-def test_frontend_root_serves_app_shell():
+def test_root_exposes_backend_metadata():
     client = TestClient(server.app)
 
     response = client.get("/")
 
     assert response.status_code == 200
-    assert "text/html" in response.headers["content-type"]
-    assert "Answer Quantum Map" in response.text
+    payload = response.json()
+    assert payload["service"] == "EvoHive Backend"
+    assert payload["endpoints"]["status"] == "/api/status"
 
 
 def test_backend_status_exposes_service_metadata():
@@ -33,11 +34,11 @@ def test_backend_status_exposes_service_metadata():
     payload = response.json()
     assert payload["service"] == "EvoHive Backend"
     assert payload["status"] == "ok"
-    assert payload["endpoints"]["frontend"] == "/"
+    assert payload["endpoints"]["status"] == "/api/status"
     assert payload["endpoints"]["websocket"] == "/ws"
 
 
-def test_server_main_starts_without_frontend_reference(monkeypatch):
+def test_server_main_starts_without_static_app_reference(monkeypatch):
     calls = []
 
     def _fake_uvicorn_run(*args, **kwargs):

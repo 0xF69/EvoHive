@@ -303,7 +303,7 @@ async def test_evolution_fast_mode_e2e():
     assert "claims" in result.verification_report
     assert result.claim_verification_report["version"] == "claim-verification-loop.v1"
 
-    # Answer graph populated for frontend rendering
+    # Answer graph populated for API consumers
     assert result.answer_graph["version"] == "answer-graph.v1"
     assert result.answer_graph["summary"]["node_count"] > 0
     assert any(node["type"] == "answer_quantum" for node in result.answer_graph["nodes"])

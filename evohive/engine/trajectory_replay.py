@@ -1,4 +1,4 @@
-"""Build frontend-friendly trajectory replay payloads."""
+"""Build trajectory replay payloads for API consumers."""
 
 from __future__ import annotations
 
